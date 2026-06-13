@@ -42,6 +42,9 @@ const store = await createStore({
 
 /* ---------- app ---------- */
 const app = express();
+const isProduction =
+  process.env.NODE_ENV === "production" || Boolean(process.env.RENDER);
+
 app.set("trust proxy", 1); // يعمل خلف reverse proxy في الاستضافات (Railway/Render/Nginx)
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -50,7 +53,14 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 * 8 },
+    proxy: true, // ضروري لعمل الكوكيز خلف HTTPS على Render
+    name: "trendora.sid",
+    cookie: {
+      httpOnly: true,
+      secure: isProduction, // Secure cookie على HTTPS
+      sameSite: "lax",
+      maxAge: 1000 * 60 * 60 * 8,
+    },
   })
 );
 

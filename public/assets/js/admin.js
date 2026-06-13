@@ -2,53 +2,76 @@
 
 const $ = (id) => document.getElementById(id);
 
+/** fetch مع إرسال كوكيز الجلسة (ضروري لتسجيل الدخول على HTTPS) */
+function api(url, options = {}) {
+  return fetch(url, { credentials: "same-origin", ...options });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
-    const me = await fetch("/api/me").then((r) => r.json()).catch(() => ({}));
+  try {
+    const me = await api("/api/me").then((r) => r.json()).catch(() => ({}));
     if (me.isAdmin) showApp();
     else showLogin();
 
-    $("loginForm").addEventListener("submit", handleLogin);
-    $("logoutBtn").addEventListener("click", handleLogout);
+    $("loginForm")?.addEventListener("submit", handleLogin);
+    $("logoutBtn")?.addEventListener("click", handleLogout);
 
     document.querySelectorAll(".tab-btn").forEach((b) =>
-        b.addEventListener("click", () => switchView(b.dataset.view, b))
+      b.addEventListener("click", () => switchView(b.dataset.view, b))
     );
-    $("newArticleTab").addEventListener("click", () => resetEditor());
+    $("newArticleTab")?.addEventListener("click", () => resetEditor());
 
-    $("articleForm").addEventListener("submit", saveArticle);
-    $("cancelEditBtn").addEventListener("click", () => switchTo("list"));
+    $("articleForm")?.addEventListener("submit", saveArticle);
+    $("cancelEditBtn")?.addEventListener("click", () => switchTo("list"));
 
-    // image
-    $("uploadImageBtn").addEventListener("click", () => $("fImageFile").click());
-    $("fImageFile").addEventListener("change", uploadImage);
-    $("removeImageBtn").addEventListener("click", () => setImage(""));
-    $("fImageUrl").addEventListener("input", (e) => setImage(e.target.value.trim()));
+    $("uploadImageBtn")?.addEventListener("click", () => $("fImageFile")?.click());
+    $("fImageFile")?.addEventListener("change", uploadImage);
+    $("removeImageBtn")?.addEventListener("click", () => setImage(""));
+    $("fImageUrl")?.addEventListener("input", (e) => setImage(e.target.value.trim()));
 
-    // editor toolbar
     document.querySelectorAll(".editor-toolbar button").forEach((b) =>
-        b.addEventListener("click", () => insertSnippet(b.dataset.tag))
+      b.addEventListener("click", () => insertSnippet(b.dataset.tag))
     );
 
-    // AI
-    $("generateBtn").addEventListener("click", generateAI);
-    $("useAiBtn").addEventListener("click", useAiResult);
+    $("generateBtn")?.addEventListener("click", generateAI);
+    $("useAiBtn")?.addEventListener("click", useAiResult);
+  } catch (err) {
+    console.error("Admin init error:", err);
+    const errEl = $("loginError");
+    if (errEl) errEl.textContent = "خطأ في تحميل لوحة التحكم. أعد تحميل الصفحة.";
+  }
 });
 
 /* ---------- auth ---------- */
 async function handleLogin(e) {
     e.preventDefault();
-    $("loginError").textContent = "";
-    const password = $("passwordInput").value;
-    const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-    });
-    if (res.ok) showApp();
-    else $("loginError").textContent = "كلمة المرور غير صحيحة";
+    const errEl = $("loginError");
+    const btn = $("loginForm")?.querySelector('button[type="submit"]');
+    if (errEl) errEl.textContent = "";
+    if (btn) { btn.disabled = true; btn.textContent = "جارٍ الدخول..."; }
+
+    try {
+        const password = $("passwordInput").value;
+        const res = await api("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+        });
+        if (res.ok) {
+            showApp();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            if (errEl) errEl.textContent = data.error || "كلمة المرور غير صحيحة";
+        }
+    } catch (err) {
+        console.error(err);
+        if (errEl) errEl.textContent = "تعذّر الاتصال بالخادم. أعد المحاولة.";
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "دخول"; }
+    }
 }
 async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
+    await api("/api/logout", { method: "POST" });
     showLogin();
 }
 function showLogin() {
@@ -78,7 +101,7 @@ async function loadArticles() {
     const tbody = $("articlesTbody");
     tbody.innerHTML = `<tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>`;
     try {
-        const { articles } = await fetch("/api/admin/articles").then((r) => r.json());
+        const { articles } = await api("/api/admin/articles").then((r) => r.json());
         renderStats(articles);
         if (!articles.length) {
             tbody.innerHTML = `<tr><td colspan="5" class="loading">لا توجد مقالات بعد. ابدأ بإنشاء مقال جديد.</td></tr>`;
@@ -130,19 +153,19 @@ function bindRowActions() {
 async function rowAction(act, id, tr) {
     if (act === "edit") return editArticle(id);
     if (act === "view") {
-        const { article } = await fetch(`/api/admin/articles/${id}`).then((r) => r.json());
+        const { article } = await api(`/api/admin/articles/${id}`).then((r) => r.json());
         return window.open(`/article/${encodeURIComponent(article.slug)}`, "_blank");
     }
     if (act === "publish") return changeStatus(id, "published");
     if (act === "hide") return changeStatus(id, "hidden");
     if (act === "delete") {
         if (!confirm("هل أنت متأكد من حذف هذا المقال نهائياً؟")) return;
-        await fetch(`/api/admin/articles/${id}`, { method: "DELETE" });
+        await api(`/api/admin/articles/${id}`, { method: "DELETE" });
         loadArticles();
     }
 }
 async function changeStatus(id, status) {
-    await fetch(`/api/admin/articles/${id}/status`, {
+    await api(`/api/admin/articles/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -159,7 +182,7 @@ function resetEditor() {
     $("saveMsg").textContent = "";
 }
 async function editArticle(id) {
-    const { article } = await fetch(`/api/admin/articles/${id}`).then((r) => r.json());
+    const { article } = await api(`/api/admin/articles/${id}`).then((r) => r.json());
     $("editorTitle").textContent = "تحرير المقال";
     $("articleId").value = article.id;
     $("fTitle").value = article.title;
@@ -189,7 +212,7 @@ async function saveArticle(e) {
     msg.textContent = "جارٍ الحفظ...";
     msg.className = "save-msg";
     try {
-        const res = await fetch(id ? `/api/admin/articles/${id}` : "/api/admin/articles", {
+        const res = await api(id ? `/api/admin/articles/${id}` : "/api/admin/articles", {
             method: id ? "PUT" : "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -229,7 +252,7 @@ async function uploadImage(e) {
     fd.append("image", file);
     $("uploadImageBtn").textContent = "جارٍ الرفع...";
     try {
-        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+        const res = await api("/api/admin/upload", { method: "POST", body: fd });
         const data = await res.json();
         if (data.url) setImage(data.url);
         else alert(data.error || "فشل الرفع");
@@ -265,7 +288,7 @@ async function generateAI() {
     setAiStatus('جارٍ توليد المقال بالذكاء الاصطناعي... قد يستغرق بضع ثوانٍ <span class="spinner"></span>');
     $("aiResult").hidden = true;
     try {
-        const res = await fetch("/api/admin/ai/generate", {
+        const res = await api("/api/admin/ai/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
