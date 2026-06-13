@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     $("articleForm")?.addEventListener("submit", saveArticle);
     $("cancelEditBtn")?.addEventListener("click", () => switchTo("list"));
+    $("revertBtn")?.addEventListener("click", revertEdit);
 
     $("uploadImageBtn")?.addEventListener("click", () => $("fImageFile")?.click());
     $("fImageFile")?.addEventListener("change", uploadImage);
@@ -346,27 +347,61 @@ async function changeStatus(id, status) {
 }
 
 /* ---------- editor ---------- */
-function resetEditor() {
-    $("editorTitle").textContent = "مقال جديد";
-    $("articleForm").reset();
-    $("articleId").value = "";
-    setImage("");
-    $("saveMsg").textContent = "";
-}
-async function editArticle(id) {
-    const { article } = await api(`/api/admin/articles/${id}`).then((r) => r.json());
-    $("editorTitle").textContent = "تحرير المقال";
-    $("articleId").value = article.id;
-    $("fTitle").value = article.title;
-    $("fCategory").value = article.category;
+let editingOriginal = null; // نسخة المقال الأصلية للتراجع عن التعديلات
+
+/** يطبّق بيانات مقال على حقول المحرر */
+function fillEditorFields(article) {
+    $("articleId").value = article.id || "";
+    $("fTitle").value = article.title || "";
+    $("fCategory").value = article.category || "";
     $("fAuthor").value = article.author || "";
     $("fExcerpt").value = article.excerpt || "";
     $("fContent").value = article.content || "";
     $("fTags").value = (article.tags || []).join(", ");
     $("fKeywords").value = (article.keywords || []).join(", ");
-    $("fStatus").value = article.status;
+    $("fStatus").value = article.status || "published";
     setImage(article.image || "");
+}
+
+/** يضبط أزرار المحرر حسب الوضع: تحرير أو مقال جديد */
+function setEditorMode(isEditing) {
+    $("editorTitle").textContent = isEditing ? "تحرير المقال" : "مقال جديد";
+    $("saveBtn").textContent = isEditing ? "حفظ التعديل" : "حفظ المقال";
+    $("revertBtn").hidden = !isEditing;
+}
+
+function resetEditor() {
+    editingOriginal = null;
+    $("articleForm").reset();
+    $("articleId").value = "";
+    setImage("");
+    $("saveMsg").textContent = "";
+    setEditorMode(false);
+}
+async function editArticle(id) {
+    const res = await api(`/api/admin/articles/${id}`);
+    if (res.status === 401) return handleUnauthorized();
+    const { article } = await res.json();
+    if (!article) {
+        alert("تعذّر تحميل المقال.");
+        return;
+    }
+    editingOriginal = article;
+    fillEditorFields(article);
+    setEditorMode(true);
+    $("saveMsg").textContent = "";
+    $("saveMsg").className = "save-msg";
     switchTo("editor");
+}
+
+/** يعيد الحقول إلى آخر نسخة محفوظة (تراجع عن التعديلات غير المحفوظة) */
+function revertEdit() {
+    if (!editingOriginal) return;
+    if (!confirm("التراجع عن كل التعديلات غير المحفوظة والعودة للنسخة الأصلية؟")) return;
+    fillEditorFields(editingOriginal);
+    const msg = $("saveMsg");
+    msg.textContent = "تم التراجع عن التعديلات.";
+    msg.className = "save-msg";
 }
 async function saveArticle(e) {
     e.preventDefault();
@@ -382,18 +417,33 @@ async function saveArticle(e) {
         keywords: $("fKeywords").value.split(",").map((t) => t.trim()).filter(Boolean),
         status: $("fStatus").value,
     };
+    if (!payload.title || !payload.content) {
+        const msg = $("saveMsg");
+        msg.textContent = "العنوان والمحتوى مطلوبان.";
+        msg.className = "save-msg err";
+        return;
+    }
     const msg = $("saveMsg");
     msg.textContent = "جارٍ الحفظ...";
     msg.className = "save-msg";
     try {
-        const res = await api(id ? `/api/admin/articles/${id}` : "/api/admin/articles", {
+        let res = await api(id ? `/api/admin/articles/${id}` : "/api/admin/articles", {
             method: id ? "PUT" : "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
+        if (res.status === 401) return handleUnauthorized();
+        // إذا كنا نحرّر مقالاً لم يعد موجوداً، نحفظه كمقال جديد حتى لا يضيع المحتوى
+        if (res.status === 404 && id) {
+            res = await api("/api/admin/articles", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+        }
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || "خطأ");
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "تعذّر الحفظ");
         }
         msg.textContent = "✓ تم الحفظ بنجاح";
         msg.className = "save-msg ok";
