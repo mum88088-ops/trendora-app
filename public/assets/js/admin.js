@@ -29,6 +29,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("fImageFile")?.addEventListener("change", uploadImage);
     $("removeImageBtn")?.addEventListener("click", () => setImage(""));
     $("fImageUrl")?.addEventListener("input", (e) => setImage(e.target.value.trim()));
+    document.querySelectorAll(".img-tab").forEach((btn) =>
+        btn.addEventListener("click", () => switchImageTab(btn.dataset.imgtab))
+    );
 
     document.querySelectorAll(".editor-toolbar button").forEach((b) =>
       b.addEventListener("click", () => insertSnippet(b.dataset.tag))
@@ -436,7 +439,7 @@ function fillEditorFields(article) {
     // المدة تُترك "دائم" افتراضياً؛ الانتهاء الحالي يُعرض كتلميح
     $("fExpiry").value = "";
     updateExpiryHint(article.expiresAt);
-    setImage(article.image || "");
+    setImage(article.image || "", { syncUrlField: true });
 }
 
 /** يعرض تاريخ الانتهاء الحالي للمقال كتلميح */
@@ -466,6 +469,7 @@ function resetEditor() {
     $("articleForm").reset();
     $("articleId").value = "";
     setImage("");
+    switchImageTab("url");
     updateExpiryHint(null);
     $("saveMsg").textContent = "";
     setEditorMode(false);
@@ -554,13 +558,27 @@ async function saveArticle(e) {
 }
 
 /* ---------- image ---------- */
-function setImage(url) {
+function switchImageTab(tab) {
+    document.querySelectorAll(".img-tab").forEach((b) =>
+        b.classList.toggle("active", b.dataset.imgtab === tab)
+    );
+    ["url", "device", "ai"].forEach((t) => {
+        const pane = $(`imgpane-${t}`);
+        if (pane) pane.hidden = t !== tab;
+    });
+}
+
+function setImage(url, opts = {}) {
     $("fImage").value = url || "";
     const preview = $("imagePreview");
     if (url) {
         preview.style.backgroundImage = `url('${url}')`;
         preview.innerHTML = "";
         $("removeImageBtn").hidden = false;
+        // عند تحميل مقال موجود بصورة برابط خارجي، اعرض الرابط في حقله
+        if (opts.syncUrlField && /^https?:\/\//i.test(url) && $("fImageUrl")) {
+            $("fImageUrl").value = url;
+        }
     } else {
         preview.style.backgroundImage = "";
         preview.innerHTML = "<span>لا توجد صورة</span>";
@@ -576,13 +594,20 @@ async function uploadImage(e) {
     $("uploadImageBtn").textContent = "جارٍ الرفع...";
     try {
         const res = await api("/api/admin/upload", { method: "POST", body: fd });
-        const data = await res.json();
-        if (data.url) setImage(data.url);
-        else alert(data.error || "فشل الرفع");
+        if (res.status === 401) return handleUnauthorized();
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.url) {
+            setImage(data.url);
+        } else {
+            alert(
+                (data.error || "فشل رفع الصورة") +
+                    "\n\nنصيحة: إذا لم يُفعّل Firebase Storage، استخدم خيار «رابط صورة» بدلاً من ذلك."
+            );
+        }
     } catch {
-        alert("فشل رفع الصورة");
+        alert("تعذّر رفع الصورة. جرّب خيار «رابط صورة» (Unsplash مثلاً).");
     } finally {
-        $("uploadImageBtn").textContent = "رفع صورة من الجهاز";
+        $("uploadImageBtn").textContent = "اختر صورة من جهازك";
         e.target.value = "";
     }
 }

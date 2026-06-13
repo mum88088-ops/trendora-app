@@ -182,6 +182,23 @@
 .image-actions { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
 .image-actions small { color: var(--color-muted); margin-top: 4px; }
 
+/* تبويبات اختيار الصورة */
+.img-tabs { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+.img-tab {
+    padding: 9px 16px; border: 1px solid var(--color-border);
+    background: #fff; border-radius: 10px; cursor: pointer;
+    font-family: var(--font-body); font-weight: 600; font-size: 0.9rem;
+    color: var(--color-text-soft); transition: all .2s;
+}
+.img-tab:hover { border-color: var(--color-primary); }
+.img-tab.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.img-pane { margin-top: 12px; }
+.img-pane input[type="url"], .img-pane input[type="text"] {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--color-border);
+    border-radius: 10px; font-family: var(--font-body); outline: none;
+}
+.img-pane input:focus { border-color: var(--color-primary); }
+
 .ai-image-box { margin-top: 14px; border-top: 1px dashed var(--color-border); padding-top: 14px; }
 .ai-image-box > small { color: var(--color-muted); display: block; margin-bottom: 8px; }
 .ai-image-row { display: flex; gap: 8px; flex-wrap: wrap; }

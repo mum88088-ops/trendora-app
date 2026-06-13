@@ -133,21 +133,43 @@
                         <div class="image-uploader">
                             <div class="image-preview" id="imagePreview"><span>لا توجد صورة</span></div>
                             <div class="image-actions">
-                                <input type="file" id="fImageFile" accept="image/*" hidden>
-                                <button type="button" class="btn-ghost" id="uploadImageBtn">رفع صورة من الجهاز</button>
-                                <button type="button" class="btn-ghost danger" id="removeImageBtn" hidden>إزالة</button>
                                 <input type="hidden" id="fImage">
-                                <small>أو الصق رابط صورة:</small>
-                                <input type="url" id="fImageUrl" placeholder="https://...">
+                                <button type="button" class="btn-ghost danger" id="removeImageBtn" hidden>إزالة الصورة</button>
                             </div>
                         </div>
-                        <div class="ai-image-box">
-                            <small>أو ولّد صورة بالذكاء الاصطناعي:</small>
+
+                        <!-- الخيارات بتبويبات -->
+                        <div class="img-tabs">
+                            <button type="button" class="img-tab active" data-imgtab="url">🔗 رابط صورة</button>
+                            <button type="button" class="img-tab" data-imgtab="device">📁 من الجهاز</button>
+                            <button type="button" class="img-tab" data-imgtab="ai">🎨 ذكاء اصطناعي</button>
+                        </div>
+
+                        <!-- تبويب: رابط خارجي (الأفضل بدون Storage) -->
+                        <div class="img-pane" id="imgpane-url">
+                            <input type="url" id="fImageUrl" placeholder="https://example.com/image.jpg">
+                            <small class="field-hint">الصق رابط صورة مباشر (ينتهي غالباً بـ .jpg أو .png). مصادر مجانية: 
+                                <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a> ·
+                                <a href="https://www.pexels.com/ar-ar/" target="_blank" rel="noopener">Pexels</a> ·
+                                <a href="https://pixabay.com/ar/" target="_blank" rel="noopener">Pixabay</a>.
+                                في Unsplash: انقر يمين على الصورة ← «نسخ عنوان الصورة».</small>
+                        </div>
+
+                        <!-- تبويب: رفع من الجهاز (يتطلب تفعيل Firebase Storage) -->
+                        <div class="img-pane" id="imgpane-device" hidden>
+                            <input type="file" id="fImageFile" accept="image/*" hidden>
+                            <button type="button" class="btn-ghost" id="uploadImageBtn">اختر صورة من جهازك</button>
+                            <small class="field-hint">يتطلب تفعيل Firebase Storage (خطة Blaze). إن لم يعمل، استخدم خيار «رابط صورة».</small>
+                        </div>
+
+                        <!-- تبويب: توليد بالذكاء الاصطناعي -->
+                        <div class="img-pane" id="imgpane-ai" hidden>
                             <div class="ai-image-row">
                                 <input type="text" id="aiImagePrompt" placeholder="وصف الصورة (يُملأ تلقائياً من العنوان)">
                                 <select id="aiImageProvider" aria-label="أداة توليد الصورة"></select>
-                                <button type="button" class="btn-ghost" id="genImageBtn">🎨 توليد صورة</button>
+                                <button type="button" class="btn-ghost" id="genImageBtn">توليد صورة</button>
                             </div>
+                            <small class="field-hint">يتطلب تفعيل Firebase Storage لحفظ الصورة المولّدة.</small>
                             <small class="ai-status" id="aiImageStatus"></small>
                         </div>
                     </div>
