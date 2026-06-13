@@ -1,0 +1,316 @@
+/* ===== Trendora Admin logic ===== */
+
+const $ = (id) => document.getElementById(id);
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const me = await fetch("/api/me").then((r) => r.json()).catch(() => ({}));
+    if (me.isAdmin) showApp();
+    else showLogin();
+
+    $("loginForm").addEventListener("submit", handleLogin);
+    $("logoutBtn").addEventListener("click", handleLogout);
+
+    document.querySelectorAll(".tab-btn").forEach((b) =>
+        b.addEventListener("click", () => switchView(b.dataset.view, b))
+    );
+    $("newArticleTab").addEventListener("click", () => resetEditor());
+
+    $("articleForm").addEventListener("submit", saveArticle);
+    $("cancelEditBtn").addEventListener("click", () => switchTo("list"));
+
+    // image
+    $("uploadImageBtn").addEventListener("click", () => $("fImageFile").click());
+    $("fImageFile").addEventListener("change", uploadImage);
+    $("removeImageBtn").addEventListener("click", () => setImage(""));
+    $("fImageUrl").addEventListener("input", (e) => setImage(e.target.value.trim()));
+
+    // editor toolbar
+    document.querySelectorAll(".editor-toolbar button").forEach((b) =>
+        b.addEventListener("click", () => insertSnippet(b.dataset.tag))
+    );
+
+    // AI
+    $("generateBtn").addEventListener("click", generateAI);
+    $("useAiBtn").addEventListener("click", useAiResult);
+});
+
+/* ---------- auth ---------- */
+async function handleLogin(e) {
+    e.preventDefault();
+    $("loginError").textContent = "";
+    const password = $("passwordInput").value;
+    const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+    });
+    if (res.ok) showApp();
+    else $("loginError").textContent = "كلمة المرور غير صحيحة";
+}
+async function handleLogout() {
+    await fetch("/api/logout", { method: "POST" });
+    showLogin();
+}
+function showLogin() {
+    $("loginScreen").hidden = false;
+    $("adminApp").hidden = true;
+}
+function showApp() {
+    $("loginScreen").hidden = true;
+    $("adminApp").hidden = false;
+    loadArticles();
+}
+
+/* ---------- views ---------- */
+function switchView(view, btn) {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    if (btn) btn.classList.add("active");
+    ["list", "editor", "ai"].forEach((v) => ($(`view-${v}`).hidden = v !== view));
+    if (view === "list") loadArticles();
+}
+function switchTo(view) {
+    const btn = document.querySelector(`.tab-btn[data-view="${view}"]`);
+    switchView(view, btn);
+}
+
+/* ---------- list ---------- */
+async function loadArticles() {
+    const tbody = $("articlesTbody");
+    tbody.innerHTML = `<tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>`;
+    try {
+        const { articles } = await fetch("/api/admin/articles").then((r) => r.json());
+        renderStats(articles);
+        if (!articles.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="loading">لا توجد مقالات بعد. ابدأ بإنشاء مقال جديد.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = articles.map(rowHtml).join("");
+        bindRowActions();
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="5" class="loading">تعذّر التحميل.</td></tr>`;
+    }
+}
+function renderStats(articles) {
+    const pub = articles.filter((a) => a.status === "published").length;
+    const draft = articles.filter((a) => a.status === "draft").length;
+    const hidden = articles.filter((a) => a.status === "hidden").length;
+    $("stats").innerHTML =
+        `<span>الكل: ${articles.length}</span>` +
+        `<span>منشور: ${pub}</span>` +
+        `<span>مسودة: ${draft}</span>` +
+        `<span>مخفي: ${hidden}</span>`;
+}
+function rowHtml(a) {
+    const statusLabel = { published: "منشور", draft: "مسودة", hidden: "مخفي" }[a.status] || a.status;
+    return `
+    <tr data-id="${a.id}">
+        <td class="article-title-cell">${escapeHtml(a.title)}</td>
+        <td>${escapeHtml(a.category)}</td>
+        <td><span class="badge ${a.status}">${statusLabel}</span></td>
+        <td>${formatDate(a.createdAt)}</td>
+        <td>
+            <div class="row-actions">
+                <button data-act="edit">تحرير</button>
+                ${a.status !== "published" ? `<button data-act="publish">نشر</button>` : ""}
+                ${a.status !== "hidden" ? `<button data-act="hide">إخفاء</button>` : ""}
+                <button data-act="view">عرض</button>
+                <button data-act="delete" class="danger">حذف</button>
+            </div>
+        </td>
+    </tr>`;
+}
+function bindRowActions() {
+    document.querySelectorAll("#articlesTbody tr").forEach((tr) => {
+        const id = tr.dataset.id;
+        tr.querySelectorAll("button").forEach((btn) => {
+            btn.addEventListener("click", () => rowAction(btn.dataset.act, id, tr));
+        });
+    });
+}
+async function rowAction(act, id, tr) {
+    if (act === "edit") return editArticle(id);
+    if (act === "view") {
+        const { article } = await fetch(`/api/admin/articles/${id}`).then((r) => r.json());
+        return window.open(`/article/${encodeURIComponent(article.slug)}`, "_blank");
+    }
+    if (act === "publish") return changeStatus(id, "published");
+    if (act === "hide") return changeStatus(id, "hidden");
+    if (act === "delete") {
+        if (!confirm("هل أنت متأكد من حذف هذا المقال نهائياً؟")) return;
+        await fetch(`/api/admin/articles/${id}`, { method: "DELETE" });
+        loadArticles();
+    }
+}
+async function changeStatus(id, status) {
+    await fetch(`/api/admin/articles/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+    });
+    loadArticles();
+}
+
+/* ---------- editor ---------- */
+function resetEditor() {
+    $("editorTitle").textContent = "مقال جديد";
+    $("articleForm").reset();
+    $("articleId").value = "";
+    setImage("");
+    $("saveMsg").textContent = "";
+}
+async function editArticle(id) {
+    const { article } = await fetch(`/api/admin/articles/${id}`).then((r) => r.json());
+    $("editorTitle").textContent = "تحرير المقال";
+    $("articleId").value = article.id;
+    $("fTitle").value = article.title;
+    $("fCategory").value = article.category;
+    $("fAuthor").value = article.author || "";
+    $("fExcerpt").value = article.excerpt || "";
+    $("fContent").value = article.content || "";
+    $("fTags").value = (article.tags || []).join(", ");
+    $("fStatus").value = article.status;
+    setImage(article.image || "");
+    switchTo("editor");
+}
+async function saveArticle(e) {
+    e.preventDefault();
+    const id = $("articleId").value;
+    const payload = {
+        title: $("fTitle").value.trim(),
+        category: $("fCategory").value.trim() || "عام",
+        author: $("fAuthor").value.trim() || "فريق التحرير",
+        excerpt: $("fExcerpt").value.trim(),
+        content: $("fContent").value.trim(),
+        image: $("fImage").value.trim(),
+        tags: $("fTags").value.split(",").map((t) => t.trim()).filter(Boolean),
+        status: $("fStatus").value,
+    };
+    const msg = $("saveMsg");
+    msg.textContent = "جارٍ الحفظ...";
+    msg.className = "save-msg";
+    try {
+        const res = await fetch(id ? `/api/admin/articles/${id}` : "/api/admin/articles", {
+            method: id ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || "خطأ");
+        }
+        msg.textContent = "✓ تم الحفظ بنجاح";
+        msg.className = "save-msg ok";
+        setTimeout(() => switchTo("list"), 700);
+    } catch (err) {
+        msg.textContent = err.message;
+        msg.className = "save-msg err";
+    }
+}
+
+/* ---------- image ---------- */
+function setImage(url) {
+    $("fImage").value = url || "";
+    const preview = $("imagePreview");
+    if (url) {
+        preview.style.backgroundImage = `url('${url}')`;
+        preview.innerHTML = "";
+        $("removeImageBtn").hidden = false;
+    } else {
+        preview.style.backgroundImage = "";
+        preview.innerHTML = "<span>لا توجد صورة</span>";
+        $("removeImageBtn").hidden = true;
+        $("fImageUrl").value = "";
+    }
+}
+async function uploadImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("image", file);
+    $("uploadImageBtn").textContent = "جارٍ الرفع...";
+    try {
+        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (data.url) setImage(data.url);
+        else alert(data.error || "فشل الرفع");
+    } catch {
+        alert("فشل رفع الصورة");
+    } finally {
+        $("uploadImageBtn").textContent = "رفع صورة";
+    }
+}
+
+/* ---------- editor snippets ---------- */
+function insertSnippet(tag) {
+    const ta = $("fContent");
+    const snippets = {
+        h2: "\n<h2>عنوان فرعي</h2>\n",
+        p: "\n<p>اكتب فقرة هنا...</p>\n",
+        ul: "\n<ul>\n  <li>عنصر أول</li>\n  <li>عنصر ثانٍ</li>\n</ul>\n",
+        blockquote: "\n<blockquote>اقتباس مميز</blockquote>\n",
+    };
+    const text = snippets[tag] || "";
+    const start = ta.selectionStart;
+    ta.value = ta.value.slice(0, start) + text + ta.value.slice(ta.selectionEnd);
+    ta.focus();
+}
+
+/* ---------- AI ---------- */
+let lastAi = null;
+async function generateAI() {
+    const topic = $("aiTopic").value.trim();
+    if (!topic) { setAiStatus("يرجى إدخال موضوع المقال.", true); return; }
+    const btn = $("generateBtn");
+    btn.disabled = true;
+    setAiStatus('جارٍ توليد المقال بالذكاء الاصطناعي... قد يستغرق بضع ثوانٍ <span class="spinner"></span>');
+    $("aiResult").hidden = true;
+    try {
+        const res = await fetch("/api/admin/ai/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                topic,
+                category: $("aiCategory").value.trim(),
+                length: $("aiLength").value,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "فشل التوليد");
+        lastAi = data;
+        $("aiPreview").innerHTML = `<h2>${escapeHtml(data.title)}</h2>${data.content}`;
+        $("aiResult").hidden = false;
+        setAiStatus("✓ تم التوليد بنجاح. راجع المقال ثم انقر للتحرير والنشر.");
+    } catch (err) {
+        setAiStatus(err.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+function setAiStatus(html, isErr = false) {
+    const el = $("aiStatus");
+    el.innerHTML = html;
+    el.className = isErr ? "ai-status err" : "ai-status";
+}
+function useAiResult() {
+    if (!lastAi) return;
+    resetEditor();
+    $("fTitle").value = lastAi.title || "";
+    $("fExcerpt").value = lastAi.excerpt || "";
+    $("fContent").value = lastAi.content || "";
+    $("fCategory").value = lastAi.category || $("aiCategory").value.trim() || "عام";
+    $("fTags").value = (lastAi.tags || []).join(", ");
+    $("fStatus").value = "draft";
+    switchTo("editor");
+}
+
+/* ---------- helpers ---------- */
+function formatDate(iso) {
+    try {
+        return new Date(iso).toLocaleDateString("ar-EG", { year: "numeric", month: "short", day: "numeric" });
+    } catch { return ""; }
+}
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}

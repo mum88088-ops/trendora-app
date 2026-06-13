@@ -1,0 +1,4 @@
+# ملف ads.txt الخاص بـ Trendora
+# بعد قبولك في Google AdSense، استبدل pub-0000000000000000 بمعرّف الناشر الخاص بك
+# مثال: google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

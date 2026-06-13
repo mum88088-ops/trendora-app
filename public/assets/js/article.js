@@ -1,0 +1,144 @@
+/* ===== Trendora — Single article logic ===== */
+
+document.addEventListener("DOMContentLoaded", () => {
+    const slug = getSlug();
+    if (!slug) {
+        showError("لم يتم تحديد المقال.");
+        return;
+    }
+    loadArticle(slug);
+    loadRelated(slug);
+});
+
+function getSlug() {
+    // supports /article/:slug  and  /article.html?slug=...  and  ?id=...
+    const path = location.pathname.split("/").filter(Boolean);
+    if (path[0] === "article" && path[1]) return decodeURIComponent(path[1]);
+    const params = new URLSearchParams(location.search);
+    return params.get("slug") || params.get("id");
+}
+
+async function loadArticle(slug) {
+    const container = document.getElementById("articleContainer");
+    try {
+        const res = await fetch(`/api/articles/${encodeURIComponent(slug)}`);
+        if (!res.ok) throw new Error("not found");
+        const { article } = await res.json();
+        renderArticle(article);
+        updateSeo(article);
+    } catch {
+        showError("المقال غير موجود أو غير منشور.");
+    }
+}
+
+function renderArticle(a) {
+    const container = document.getElementById("articleContainer");
+    document.getElementById("crumbCat").textContent = a.category || "المقال";
+
+    const image = a.image
+        ? `<div class="article-featured-image" style="background-image:url('${a.image}')"></div>`
+        : `<div class="article-featured-image placeholder"></div>`;
+
+    const tags = (a.tags || [])
+        .map((t) => `<span class="tag">#${escapeHtml(t)}</span>`)
+        .join("");
+
+    container.innerHTML = `
+        <header class="article-header">
+            <span class="card-category">${escapeHtml(a.category)}</span>
+            <h1>${escapeHtml(a.title)}</h1>
+            <div class="article-meta">
+                <span>بقلم ${escapeHtml(a.author || "فريق التحرير")}</span>
+                <span>${formatDate(a.createdAt)}</span>
+                <span>${a.readingTime || 3} دقائق قراءة</span>
+            </div>
+        </header>
+        ${image}
+        <div class="article-content" id="articleBody">${injectAds(a.content || "")}</div>
+        <footer class="article-footer">
+            <div class="tags">${tags}</div>
+        </footer>
+        <div class="ad-container ad-end"><span class="ad-label">إعلان</span></div>
+    `;
+}
+
+// Insert in-article ad slots between paragraphs (after 2nd and before last third)
+function injectAds(html) {
+    const adSlot =
+        '<div class="ad-container ad-in-article"><span class="ad-label">إعلان</span></div>';
+    const parts = html.split("</p>");
+    if (parts.length < 4) return html;
+    const mid = Math.floor(parts.length / 2);
+    parts[1] += "</p>" + adSlot;
+    parts[mid] += "</p>" + adSlot;
+    return parts.join("</p>").replace(adSlot + "</p>", adSlot); // tidy
+}
+
+function updateSeo(a) {
+    const url = `${location.origin}/article/${encodeURIComponent(a.slug)}`;
+    document.title = `${a.title} | Trendora`;
+    setAttr("metaDescription", "content", a.excerpt || a.title);
+    setAttr("metaCanonical", "href", url);
+    setAttr("ogTitle", "content", a.title);
+    setAttr("ogDesc", "content", a.excerpt || a.title);
+    setAttr("ogImage", "content", a.image ? location.origin + a.image : location.origin + "/assets/img/logo.svg");
+
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        headline: a.title,
+        description: a.excerpt || "",
+        image: a.image ? location.origin + a.image : location.origin + "/assets/img/logo.svg",
+        datePublished: a.createdAt,
+        dateModified: a.updatedAt || a.createdAt,
+        author: { "@type": "Organization", name: a.author || "Trendora" },
+        publisher: {
+            "@type": "Organization",
+            name: "Trendora",
+            logo: { "@type": "ImageObject", url: location.origin + "/assets/img/logo.svg" },
+        },
+        mainEntityOfPage: url,
+    };
+    const el = document.getElementById("jsonLd");
+    if (el) el.textContent = JSON.stringify(jsonLd);
+}
+
+async function loadRelated(currentSlug) {
+    const grid = document.getElementById("relatedGrid");
+    try {
+        const res = await fetch("/api/articles");
+        const { articles } = await res.json();
+        const related = articles.filter((a) => a.slug !== currentSlug).slice(0, 3);
+        if (!related.length) {
+            grid.innerHTML = `<div class="empty-state">لا توجد مقالات أخرى.</div>`;
+            return;
+        }
+        grid.innerHTML = related
+            .map((a) => {
+                const img = a.image
+                    ? `<div class="card-image" style="background-image:url('${a.image}')"></div>`
+                    : `<div class="card-image placeholder"></div>`;
+                return `
+                <article class="article-card">
+                    <a href="/article/${encodeURIComponent(a.slug)}">${img}</a>
+                    <div class="card-body">
+                        <span class="card-category">${escapeHtml(a.category)}</span>
+                        <h3 class="card-title"><a href="/article/${encodeURIComponent(a.slug)}">${escapeHtml(a.title)}</a></h3>
+                    </div>
+                </article>`;
+            })
+            .join("");
+    } catch {
+        grid.innerHTML = "";
+    }
+}
+
+function showError(msg) {
+    const container = document.getElementById("articleContainer");
+    container.innerHTML = `<p class="empty-state">${escapeHtml(msg)} <a href="/">العودة للرئيسية</a></p>`;
+}
+
+function setAttr(id, attr, value) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute(attr, value);
+}

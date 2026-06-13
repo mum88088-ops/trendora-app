@@ -1,0 +1,30 @@
+{
+  "name": "trendora",
+  "version": "1.0.0",
+  "description": "ترندورا Trendora - منصة إخبارية حديثة مع لوحة تحكم وذكاء اصطناعي",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "news",
+    "blog",
+    "arabic",
+    "adsense",
+    "trendora"
+  ],
+  "author": "Trendora",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "mongodb": "^6.21.0",
+    "multer": "^2.1.1"
+  }
+}

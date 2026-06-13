@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>لوحة تحكم Trendora</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+    <!-- ===== Login ===== -->
+    <section class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="/assets/img/logo.svg" alt="Trendora">
+                <h1>لوحة تحكم Trendora</h1>
+                <p>سجّل الدخول لإدارة المقالات</p>
+            </div>
+            <form id="loginForm">
+                <input type="password" id="passwordInput" placeholder="كلمة المرور" required autocomplete="current-password">
+                <button type="submit" class="btn">دخول</button>
+                <p class="login-error" id="loginError"></p>
+            </form>
+        </div>
+    </section>
+
+    <!-- ===== Dashboard ===== -->
+    <div class="admin-app" id="adminApp" hidden>
+        <header class="admin-header">
+            <a href="/" class="logo" target="_blank">
+                <span class="logo-mark"><img src="/assets/img/logo.svg" alt="Trendora"></span>
+                <span class="logo-text">Trendora <small>لوحة التحكم</small></span>
+            </a>
+            <div class="admin-header-actions">
+                <a href="/" target="_blank" class="btn-ghost">عرض الموقع</a>
+                <button class="btn-ghost" id="logoutBtn">تسجيل الخروج</button>
+            </div>
+        </header>
+
+        <nav class="admin-tabs">
+            <button class="tab-btn active" data-view="list">المقالات</button>
+            <button class="tab-btn" data-view="editor" id="newArticleTab">+ مقال جديد</button>
+            <button class="tab-btn" data-view="ai">أداة الذكاء الاصطناعي</button>
+        </nav>
+
+        <main class="admin-main">
+
+            <!-- LIST VIEW -->
+            <section class="view" id="view-list">
+                <div class="view-head">
+                    <h2>إدارة المقالات</h2>
+                    <div class="stats" id="stats"></div>
+                </div>
+                <div class="table-wrap">
+                    <table class="articles-table">
+                        <thead>
+                            <tr>
+                                <th>العنوان</th>
+                                <th>التصنيف</th>
+                                <th>الحالة</th>
+                                <th>التاريخ</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="articlesTbody">
+                            <tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- EDITOR VIEW -->
+            <section class="view" id="view-editor" hidden>
+                <div class="view-head">
+                    <h2 id="editorTitle">مقال جديد</h2>
+                </div>
+                <form id="articleForm" class="editor-form">
+                    <input type="hidden" id="articleId">
+
+                    <div class="field">
+                        <label>عنوان المقال</label>
+                        <input type="text" id="fTitle" placeholder="اكتب عنواناً جذاباً..." required>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label>التصنيف</label>
+                            <input type="text" id="fCategory" list="catList" placeholder="التقنية / الصحة / عام">
+                            <datalist id="catList">
+                                <option value="التقنية"></option>
+                                <option value="الصحة"></option>
+                                <option value="عام"></option>
+                                <option value="أسلوب حياة"></option>
+                            </datalist>
+                        </div>
+                        <div class="field">
+                            <label>الكاتب</label>
+                            <input type="text" id="fAuthor" placeholder="فريق التحرير">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>وصف موجز (للـ SEO)</label>
+                        <textarea id="fExcerpt" rows="2" placeholder="جملة إلى جملتين تلخّص المقال..."></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label>صورة المقال</label>
+                        <div class="image-uploader">
+                            <div class="image-preview" id="imagePreview"><span>لا توجد صورة</span></div>
+                            <div class="image-actions">
+                                <input type="file" id="fImageFile" accept="image/*" hidden>
+                                <button type="button" class="btn-ghost" id="uploadImageBtn">رفع صورة</button>
+                                <button type="button" class="btn-ghost danger" id="removeImageBtn" hidden>إزالة</button>
+                                <input type="hidden" id="fImage">
+                                <small>أو الصق رابط صورة:</small>
+                                <input type="url" id="fImageUrl" placeholder="https://...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>محتوى المقال (HTML مسموح)</label>
+                        <div class="editor-toolbar">
+                            <button type="button" data-tag="h2">عنوان فرعي</button>
+                            <button type="button" data-tag="p">فقرة</button>
+                            <button type="button" data-tag="ul">قائمة</button>
+                            <button type="button" data-tag="blockquote">اقتباس</button>
+                        </div>
+                        <textarea id="fContent" rows="16" placeholder="<p>اكتب المحتوى هنا...</p>" required></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label>الوسوم (افصل بينها بفاصلة)</label>
+                        <input type="text" id="fTags" placeholder="تقنية, ذكاء اصطناعي, مستقبل">
+                    </div>
+
+                    <div class="field">
+                        <label>الحالة</label>
+                        <select id="fStatus">
+                            <option value="published">منشور (ظاهر للجميع)</option>
+                            <option value="draft">مسودة (غير ظاهر)</option>
+                            <option value="hidden">مخفي</option>
+                        </select>
+                    </div>
+
+                    <div class="editor-actions">
+                        <button type="submit" class="btn">حفظ المقال</button>
+                        <button type="button" class="btn-ghost" id="cancelEditBtn">إلغاء</button>
+                        <span class="save-msg" id="saveMsg"></span>
+                    </div>
+                </form>
+            </section>
+
+            <!-- AI VIEW -->
+            <section class="view" id="view-ai" hidden>
+                <div class="view-head">
+                    <h2>توليد مقال بالذكاء الاصطناعي</h2>
+                </div>
+                <div class="ai-panel">
+                    <div class="field">
+                        <label>موضوع / فكرة المقال</label>
+                        <input type="text" id="aiTopic" placeholder="مثال: فوائد الصيام المتقطع للصحة">
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>التصنيف</label>
+                            <input type="text" id="aiCategory" list="catList" placeholder="الصحة">
+                        </div>
+                        <div class="field">
+                            <label>الطول</label>
+                            <select id="aiLength">
+                                <option value="short">قصير (~500 كلمة)</option>
+                                <option value="medium" selected>متوسط (~800 كلمة)</option>
+                                <option value="long">طويل (~1300 كلمة)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-accent" id="generateBtn">✨ توليد المقال</button>
+                    <p class="ai-status" id="aiStatus"></p>
+
+                    <div class="ai-result" id="aiResult" hidden>
+                        <h3>المعاينة</h3>
+                        <div class="ai-preview" id="aiPreview"></div>
+                        <div class="editor-actions">
+                            <button type="button" class="btn" id="useAiBtn">تحرير ونشر هذا المقال</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="/assets/js/admin.js"></script>
+</body>
+</html>
