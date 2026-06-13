@@ -300,7 +300,7 @@ async function loadAiProviders() {
     try {
         const res = await api("/api/admin/ai/providers");
         if (res.status === 401) return handleUnauthorized();
-        const { providers } = await res.json();
+        const { providers, diagnostics } = await res.json();
 
         const fill = (el) => {
             if (!el) return;
@@ -324,7 +324,12 @@ async function loadAiProviders() {
                 hint.textContent = "";
                 hint.className = "field-hint";
             } else {
-                hint.textContent = "لا توجد أداة مفعّلة. أضف GEMINI_API_KEY (مجاني) أو OPENAI_API_KEY في إعدادات الخادم.";
+                let msg = "لا توجد أداة مفعّلة. أضف GEMINI_API_KEY (مجاني) أو OPENAI_API_KEY في إعدادات الخادم على Render، ثم أعد النشر (Manual Deploy).";
+                if (diagnostics) {
+                    const seen = (diagnostics.envKeysSeen || []).join("، ") || "لا شيء";
+                    msg += ` — المتغيّرات التي يراها الخادم: [${seen}]. طول مفتاح Gemini: ${diagnostics.geminiKeyLength}، طول مفتاح OpenAI: ${diagnostics.openaiKeyLength}.`;
+                }
+                hint.textContent = msg;
                 hint.className = "field-hint warn";
             }
         }

@@ -15,10 +15,10 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trendora2026";
 const SESSION_SECRET = process.env.SESSION_SECRET || "trendora-secret-change-me";
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
+const OPENAI_MODEL = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+const GEMINI_MODEL = (process.env.GEMINI_MODEL || "gemini-1.5-flash").trim();
 const MONGODB_URI = process.env.MONGODB_URI || "";
 const SITE_URL = (process.env.SITE_URL || "https://trendora1.com").replace(/\/$/, "");
 
@@ -309,11 +309,20 @@ async function generateWithGemini({ userPrompt, model }) {
 
 // المزوّدات المتاحة (لإظهارها في لوحة التحكم)
 app.get("/api/admin/ai/providers", requireAuth, (req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json({
     providers: [
       { id: "gemini", name: "Google Gemini (مجاني)", available: Boolean(GEMINI_API_KEY), defaultModel: GEMINI_MODEL },
       { id: "openai", name: "OpenAI", available: Boolean(OPENAI_API_KEY), defaultModel: OPENAI_MODEL },
     ],
+    // تشخيص آمن: يُظهر فقط هل وصل المفتاح للخادم وطوله (دون كشف القيمة)
+    diagnostics: {
+      geminiKeyLength: GEMINI_API_KEY.length,
+      openaiKeyLength: OPENAI_API_KEY.length,
+      envKeysSeen: Object.keys(process.env)
+        .filter((k) => /API_KEY|GEMINI|OPENAI/i.test(k))
+        .sort(),
+    },
   });
 });
 
