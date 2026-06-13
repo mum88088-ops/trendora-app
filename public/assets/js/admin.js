@@ -376,7 +376,7 @@ async function generateAI() {
     const provider = $("aiProvider")?.value || "";
     const btn = $("generateBtn");
     btn.disabled = true;
-    setAiStatus('جارٍ توليد المقال بالذكاء الاصطناعي... قد يستغرق بضع ثوانٍ <span class="spinner"></span>');
+    setAiStatus('جارٍ توليد المقال... يُفضّل Gemini للسرعة. قد يستغرق 20–60 ثانية <span class="spinner"></span>');
     $("aiResult").hidden = true;
     try {
         const res = await api("/api/admin/ai/generate", {

@@ -18,7 +18,8 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "trendora-secret-change-me"
 const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || "").trim();
-const GEMINI_MODEL = (process.env.GEMINI_MODEL || "gemini-1.5-flash").trim();
+const GEMINI_MODEL = (process.env.GEMINI_MODEL || "gemini-2.0-flash").trim();
+const GEMINI_FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"];
 const MONGODB_URI = process.env.MONGODB_URI || "";
 const SITE_URL = (process.env.SITE_URL || "https://trendora1.com").replace(/\/$/, "");
 
@@ -224,19 +225,50 @@ const AI_SYSTEM_PROMPT =
   "أنت كاتب محتوى عربي محترف لموقع إخباري اسمه Trendora. " +
   "تكتب مقالات أصلية عالية الجودة ومنسّقة بـ HTML نظيف وجاهزة للنشر ومتوافقة مع سياسات Google AdSense (محتوى أصلي ومفيد، بدون حشو كلمات مفتاحية، بدون محتوى منسوخ).";
 
+const AI_FETCH_TIMEOUT_MS = 120_000;
+
+function fetchWithTimeout(url, options = {}, ms = AI_FETCH_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
+function friendlyAiError(provider, status, errText) {
+  const lower = String(errText).toLowerCase();
+  if (status === 429 || lower.includes("quota") || lower.includes("insufficient_quota")) {
+    return provider === "openai"
+      ? "رصيد OpenAI منتهٍ. استخدم Google Gemini (مجاني) أو أضف رصيداً من platform.openai.com/account/billing"
+      : "تجاوزت حد استخدام Gemini المجاني. انتظر قليلاً أو جرّب لاحقاً.";
+  }
+  if (status === 401 || lower.includes("invalid api key") || lower.includes("api key not valid")) {
+    return `مفتاح ${provider === "openai" ? "OpenAI" : "Gemini"} غير صالح. تحقق من المفتاح في إعدادات Render.`;
+  }
+  if (status === 404 || lower.includes("not found") || lower.includes("is not found")) {
+    return `نموذج ${provider === "openai" ? "OpenAI" : "Gemini"} غير متاح. جرّب مزوّداً آخر أو حدّث GEMINI_MODEL.`;
+  }
+  try {
+    const parsed = JSON.parse(errText);
+    const msg = parsed?.error?.message || parsed?.error?.status;
+    if (msg) return `خطأ من ${provider === "openai" ? "OpenAI" : "Gemini"}: ${msg}`;
+  } catch {
+    /* ignore */
+  }
+  return `خطأ من ${provider === "openai" ? "OpenAI" : "Gemini"} (${status}): ${String(errText).slice(0, 200)}`;
+}
+
 function buildUserPrompt({ topic, category, length }) {
   const wordTarget =
-    length === "short" ? "400-600" : length === "long" ? "1100-1500" : "700-900";
+    length === "short" ? "350-500" : length === "long" ? "900-1200" : "550-750";
   return `اكتب مقالاً عربياً كاملاً عن الموضوع التالي: "${topic}".
 ${category ? `التصنيف: ${category}.` : ""}
-الطول المستهدف: ${wordTarget} كلمة تقريباً.
+الطول المستهدف: ${wordTarget} كلمة تقريباً (لا تتجاوز الحد).
 
 أعد الناتج بصيغة JSON فقط دون أي نص إضافي، بهذا الشكل بالضبط:
 {
   "title": "عنوان جذاب ومحسّن لمحركات البحث",
   "excerpt": "وصف موجز من جملة إلى جملتين (ميتا ديسكربشن)",
   "tags": ["وسم1", "وسم2", "وسم3"],
-  "content": "محتوى المقال بصيغة HTML باستخدام وسوم <h2> و<h3> و<p> و<ul><li> و<blockquote> فقط. قسّم المقال إلى أقسام واضحة بعناوين فرعية، وابدأ بفقرة تمهيدية، واختم بخلاصة. لا تضع وسم <h1> ولا <html> أو <body>."
+  "content": "محتوى المقال بصيغة HTML باستخدام وسوم <h2> و<h3> و<p> و<ul><li> و<blockquote> فقط. قسّم المقال إلى 4-5 أقسام بعناوين فرعية، وابدأ بفقرة تمهيدية، واختم بخلاصة. لا تضع وسم <h1> ولا <html> أو <body>."
 }`;
 }
 
@@ -257,7 +289,9 @@ function extractJson(text) {
 }
 
 async function generateWithOpenAI({ userPrompt, model }) {
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+  let resp;
+  try {
+    resp = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -269,14 +303,22 @@ async function generateWithOpenAI({ userPrompt, model }) {
         { role: "system", content: AI_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.8,
+      temperature: 0.7,
       response_format: { type: "json_object" },
     }),
   });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      const e = new Error("انتهت مهلة التوليد. جرّب الطول «قصير» أو استخدم Gemini.");
+      e.status = 504;
+      throw e;
+    }
+    throw err;
+  }
   if (!resp.ok) {
     const errText = await resp.text();
-    const e = new Error(`خطأ من OpenAI: ${resp.status} ${errText.slice(0, 300)}`);
-    e.status = 502;
+    const e = new Error(friendlyAiError("openai", resp.status, errText));
+    e.status = resp.status === 429 ? 402 : 502;
     throw e;
   }
   const json = await resp.json();
@@ -284,27 +326,51 @@ async function generateWithOpenAI({ userPrompt, model }) {
 }
 
 async function generateWithGemini({ userPrompt, model }) {
-  const useModel = model || GEMINI_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-    useModel
-  )}:generateContent?key=${GEMINI_API_KEY}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: AI_SYSTEM_PROMPT }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.8, responseMimeType: "application/json" },
-    }),
-  });
-  if (!resp.ok) {
-    const errText = await resp.text();
-    const e = new Error(`خطأ من Gemini: ${resp.status} ${errText.slice(0, 300)}`);
-    e.status = 502;
-    throw e;
+  const models = [...new Set([model || GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS])];
+  let lastErr = "";
+
+  for (const useModel of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      useModel
+    )}:generateContent?key=${GEMINI_API_KEY}`;
+    try {
+      const resp = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: AI_SYSTEM_PROMPT }] },
+          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            responseMimeType: "application/json",
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+      if (!resp.ok) {
+        lastErr = await resp.text();
+        if (resp.status === 404) continue;
+        const e = new Error(friendlyAiError("gemini", resp.status, lastErr));
+        e.status = resp.status === 429 ? 402 : 502;
+        throw e;
+      }
+      const json = await resp.json();
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text;
+      lastErr = JSON.stringify(json).slice(0, 300);
+    } catch (err) {
+      if (err.name === "AbortError") {
+        const e = new Error("انتهت مهلة التوليد. جرّب الطول «قصير» أو انتظر قليلاً.");
+        e.status = 504;
+        throw e;
+      }
+      if (err.status) throw err;
+      lastErr = err.message;
+    }
   }
-  const json = await resp.json();
-  return json.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  const e = new Error(friendlyAiError("gemini", 502, lastErr || "فشل كل النماذج"));
+  e.status = 502;
+  throw e;
 }
 
 // المزوّدات المتاحة (لإظهارها في لوحة التحكم)
@@ -369,62 +435,116 @@ app.post(
 
 /* ---------- AI image generation ---------- */
 async function imageWithOpenAI(prompt) {
-  const resp = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+  let resp;
+  try {
+    resp = await fetchWithTimeout(
+    "https://api.openai.com/v1/images/generations",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt,
+        n: 1,
+        size: "1792x1024",
+      }),
     },
-    body: JSON.stringify({
-      model: "dall-e-3",
-      prompt,
-      n: 1,
-      size: "1792x1024",
-      response_format: "b64_json",
-    }),
-  });
+    90_000
+  );
+  } catch (err) {
+    if (err.name === "AbortError") {
+      const e = new Error("انتهت مهلة توليد الصورة. جرّب مرة أخرى أو ارفع صورة من الجهاز.");
+      e.status = 504;
+      throw e;
+    }
+    throw err;
+  }
   if (!resp.ok) {
     const errText = await resp.text();
-    const e = new Error(`خطأ من OpenAI (صور): ${resp.status} ${errText.slice(0, 300)}`);
-    e.status = 502;
+    const e = new Error(friendlyAiError("openai", resp.status, errText));
+    e.status = resp.status === 429 ? 402 : 502;
     throw e;
   }
   const json = await resp.json();
+  const imageUrl = json.data?.[0]?.url;
   const b64 = json.data?.[0]?.b64_json;
-  if (!b64) {
+  if (b64) {
+    return { buffer: Buffer.from(b64, "base64"), mimetype: "image/png" };
+  }
+  if (!imageUrl) {
     const e = new Error("لم يُرجع OpenAI صورة");
     e.status = 502;
     throw e;
   }
-  return { buffer: Buffer.from(b64, "base64"), mimetype: "image/png" };
+  const imgResp = await fetchWithTimeout(imageUrl, {}, 60_000);
+  if (!imgResp.ok) {
+    const e = new Error("تعذّر تحميل الصورة من OpenAI");
+    e.status = 502;
+    throw e;
+  }
+  const buffer = Buffer.from(await imgResp.arrayBuffer());
+  const mimetype = imgResp.headers.get("content-type") || "image/png";
+  return { buffer, mimetype };
 }
 
 async function imageWithGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      instances: [{ prompt }],
-      parameters: { sampleCount: 1, aspectRatio: "16:9" },
-    }),
-  });
-  if (!resp.ok) {
-    const errText = await resp.text();
-    const e = new Error(
-      `خطأ من Gemini (صور): ${resp.status} ${errText.slice(0, 300)} — قد تتطلب صور Imagen خطة مدفوعة.`
-    );
-    e.status = 502;
-    throw e;
+  const imageModels = [
+    "gemini-2.0-flash-preview-image-generation",
+    "gemini-2.0-flash-exp-image-generation",
+  ];
+  let lastErr = "";
+
+  for (const model of imageModels) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      model
+    )}:generateContent?key=${GEMINI_API_KEY}`;
+    try {
+      const resp = await fetchWithTimeout(
+        url,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+          }),
+        },
+        90_000
+      );
+      if (!resp.ok) {
+        lastErr = await resp.text();
+        continue;
+      }
+      const json = await resp.json();
+      const parts = json.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          return {
+            buffer: Buffer.from(part.inlineData.data, "base64"),
+            mimetype: part.inlineData.mimeType || "image/png",
+          };
+        }
+      }
+      lastErr = "لم تُرجع استجابة صورة";
+    } catch (err) {
+      if (err.name === "AbortError") {
+        const e = new Error("انتهت مهلة توليد الصورة. جرّب مرة أخرى أو ارفع صورة من الجهاز.");
+        e.status = 504;
+        throw e;
+      }
+      lastErr = err.message;
+    }
   }
-  const json = await resp.json();
-  const b64 = json.predictions?.[0]?.bytesBase64Encoded;
-  if (!b64) {
-    const e = new Error("لم يُرجع Gemini صورة (قد تكون خطة Imagen غير مفعّلة)");
-    e.status = 502;
-    throw e;
-  }
-  return { buffer: Buffer.from(b64, "base64"), mimetype: "image/png" };
+
+  const e = new Error(
+    friendlyAiError("gemini", 502, lastErr) +
+      " — يمكنك رفع صورة من الجهاز أو استخدام OpenAI بعد شحن الرصيد."
+  );
+  e.status = 502;
+  throw e;
 }
 
 app.post(
@@ -435,7 +555,7 @@ app.post(
     let { provider } = req.body || {};
     if (!prompt) return res.status(400).json({ error: "يرجى إدخال وصف الصورة" });
 
-    if (!provider) provider = OPENAI_API_KEY ? "openai" : "gemini";
+    if (!provider) provider = GEMINI_API_KEY ? "gemini" : "openai";
     if (provider === "openai" && !OPENAI_API_KEY) {
       return res.status(400).json({ error: "مفتاح OpenAI غير مضبوط لتوليد الصور." });
     }
