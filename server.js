@@ -18,7 +18,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "trendora-secret-change-me"
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const MONGODB_URI = process.env.MONGODB_URI || "";
-const SITE_URL = (process.env.SITE_URL || "https://www.trendora.com").replace(/\/$/, "");
+const SITE_URL = (process.env.SITE_URL || "https://trendora1.com").replace(/\/$/, "");
 
 const DATA_FILE = path.join(__dirname, "data", "articles.json");
 const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
@@ -278,8 +278,8 @@ ${category ? `التصنيف: ${category}.` : ""}
   })
 );
 
-/* ---------- serve MongoDB-stored images (only in Mongo mode) ---------- */
-if (store.isMongo) {
+/* ---------- serve DB-stored images (MongoDB / Firestore modes) ---------- */
+if (store.servesImages) {
   app.get(
     "/uploads/:id",
     wrap(async (req, res) => {
@@ -328,7 +328,7 @@ app.get("/article/:slug", (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n  ✅ Trendora يعمل الآن على: http://localhost:${PORT}`);
   console.log(`  🛠️  لوحة التحكم: http://localhost:${PORT}/admin.html`);
-  console.log(`  💾 التخزين: ${store.isMongo ? "MongoDB" : "ملف JSON محلي"}`);
+  console.log(`  💾 التخزين: ${store.backend}`);
   if (!OPENAI_API_KEY) {
     console.log("  ⚠️  لتفعيل توليد المقالات بالذكاء الاصطناعي أضف OPENAI_API_KEY\n");
   }

@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin.html
 Disallow: /api/
 
-Sitemap: https://www.trendora.com/sitemap.xml
+Sitemap: https://trendora1.com/sitemap.xml

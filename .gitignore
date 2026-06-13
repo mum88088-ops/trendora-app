@@ -4,3 +4,9 @@ public/uploads/*
 !public/uploads/.gitkeep
 *.log
 .DS_Store
+
+# Firebase secrets — لا ترفعها أبداً
+serviceAccount*.json
+*serviceaccount*.json
+firebase-adminsdk*.json
+*-firebase-adminsdk-*.json

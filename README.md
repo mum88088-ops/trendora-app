@@ -21,37 +21,51 @@ npm start
 | `ADMIN_PASSWORD` | كلمة مرور لوحة التحكم |
 | `SESSION_SECRET` | سر الجلسات (نص عشوائي طويل) |
 | `OPENAI_API_KEY` | مفتاح OpenAI لتوليد المقالات بالذكاء الاصطناعي |
-| `SITE_URL` | رابط موقعك النهائي (مثل `https://www.trendora.com`) |
+| `SITE_URL` | رابط موقعك النهائي (مثل `https://trendora1.com`) |
+| `FIREBASE_SERVICE_ACCOUNT_B64` | مفتاح Firebase Service Account مُرمّزاً Base64 (للنشر) |
+| `FIREBASE_STORAGE_BUCKET` | حاوية تخزين صور Firebase |
 
 ## التخزين: كيف يعمل؟
 
-- **محلياً (على جهازك):** يُحفظ كل شيء في ملف `data/articles.json` والصور في `public/uploads/`. لا حاجة لأي إعداد.
-- **عند النشر:** ضع رابط `MONGODB_URI`، فيتحول الموقع تلقائياً لحفظ المقالات والصور في **MongoDB Atlas** بشكل دائم لا يُمسح أبداً.
+الموقع يختار طبقة التخزين تلقائياً حسب المتغيرات الموجودة (لا حاجة لتغيير أي كود):
 
-> لا حاجة لتغيير أي كود — فقط وجود `MONGODB_URI` يبدّل وضع التخزين تلقائياً.
+| الأولوية | الشرط | النتيجة |
+|----------|--------|---------|
+| 1 | وجود `FIREBASE_SERVICE_ACCOUNT_B64` | **Firebase Firestore** (المعتمد للنشر) |
+| 2 | وجود `MONGODB_URI` | MongoDB Atlas |
+| 3 | لا شيء (محلياً) | ملف `data/articles.json` + صور في `public/uploads/` |
 
-## النشر على الإنترنت (Render + MongoDB Atlas — مجاني)
+> محلياً على جهازك، اترك المتغيرات فارغة فيعمل بملف JSON بدون أي إعداد. عند النشر، إضافة مفتاح Firebase وحده يحوّل التخزين إلى Firestore.
 
-### الخطوة 1: أنشئ قاعدة بيانات MongoDB Atlas (مجانية)
+## النشر على الإنترنت (Render + Firebase Firestore — مجاني)
 
-1. أنشئ حساباً على [mongodb.com/atlas](https://www.mongodb.com/atlas).
-2. أنشئ **Cluster** مجانياً (نوع M0).
-3. من **Database Access**: أنشئ مستخدماً بكلمة مرور.
-4. من **Network Access**: أضف `0.0.0.0/0` (السماح من أي مكان).
-5. اضغط **Connect ➝ Drivers** وانسخ رابط الاتصال (Connection String)، وضع فيه كلمة مرور المستخدم. سيبدأ بـ `mongodb+srv://...`.
+### الخطوة 1: احصل على مفتاح Firebase Service Account
 
-### الخطوة 2: ارفع المشروع على GitHub
+1. افتح [Firebase Console](https://console.firebase.google.com/) ➝ مشروعك `trendora-data`.
+2. اضغط ⚙️ **Project Settings ➝ Service accounts**.
+3. اضغط **Generate new private key** ➝ سيُنزّل ملف JSON. **احتفظ به سرياً ولا ترفعه إلى GitHub.**
+4. فعّل **Firestore Database** (Build ➝ Firestore Database ➝ Create database ➝ Production mode).
+5. فعّل **Storage** (Build ➝ Storage ➝ Get started) لتخزين صور المقالات.
 
-```bash
-git init
-git add .
-git commit -m "Trendora ready for deploy"
-git branch -M main
-git remote add origin https://github.com/USERNAME/trendora.git
-git push -u origin main
+### الخطوة 2: رمّز المفتاح Base64 (سطر واحد)
+
+شغّل في PowerShell (استبدل المسار بمسار ملفك):
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\serviceAccount.json")) | Set-Clipboard
 ```
 
-### الخطوة 3: انشر على Render
+سيُنسخ الناتج تلقائياً إلى الحافظة — هذا ما ستضعه في `FIREBASE_SERVICE_ACCOUNT_B64`.
+
+### الخطوة 3: ارفع المشروع على GitHub
+
+```bash
+git add .
+git commit -m "Add Firebase Firestore backend"
+git push
+```
+
+### الخطوة 4: انشر على Render
 
 1. أنشئ حساباً على [render.com](https://render.com).
 2. **New ➝ Web Service** واربط مستودع GitHub.
@@ -64,26 +78,27 @@ git push -u origin main
    |---------|--------|
    | `ADMIN_PASSWORD` | كلمة مرور قوية للوحة التحكم |
    | `SESSION_SECRET` | نص عشوائي طويل |
-   | `MONGODB_URI` | رابط الاتصال من Atlas |
+   | `FIREBASE_SERVICE_ACCOUNT_B64` | الناتج المُرمّز من الخطوة 2 |
+   | `FIREBASE_STORAGE_BUCKET` | `trendora-data.firebasestorage.app` |
    | `OPENAI_API_KEY` | مفتاح OpenAI (اختياري) |
-   | `SITE_URL` | رابط موقعك النهائي |
+   | `SITE_URL` | `https://trendora1.com` |
 
-5. اضغط **Deploy**. بعد دقائق سيعمل موقعك على رابط مثل `https://trendora.onrender.com`.
+5. اضغط **Deploy**. بعد دقائق سيعمل موقعك على رابط مثل `https://trendora-app.onrender.com`.
 
-### الخطوة 4: اربط الدومين المخصص
+### الخطوة 5: اربط الدومين trendora1.com
 
-1. في Render: **Settings ➝ Custom Domains ➝ Add**، وأدخل دومينك.
-2. في لوحة الدومين (Namecheap / GoDaddy / Cloudflare) أضف السجل (CNAME) الذي يعطيك إياه Render.
+1. في Render: **Settings ➝ Custom Domains ➝ Add**، وأدخل `trendora1.com` و`www.trendora1.com`.
+2. في لوحة الدومين أضف السجلات التي يعطيك إياها Render (عادة سجل `A` أو `CNAME`).
 3. سيفعّل Render شهادة **SSL (HTTPS)** تلقائياً ومجاناً.
-4. حدّث متغير `SITE_URL` إلى رابط دومينك الحقيقي.
 
-### بديل: VPS خاص (تحكم كامل)
+### بديل: MongoDB Atlas أو VPS خاص
 
-ارفع المشروع، ثبّت Node.js، شغّل عبر **PM2** (`pm2 start server.js`)، وضع **Nginx** كـ reverse proxy مع شهادة Let's Encrypt. يمكنك حينها استخدام التخزين بملف JSON مباشرة أو MongoDB.
+- **MongoDB:** بدل مفتاح Firebase، أضف `MONGODB_URI` من [MongoDB Atlas](https://www.mongodb.com/atlas) (Cluster مجاني M0، مستخدم بكلمة مرور، Network Access = `0.0.0.0/0`).
+- **VPS:** ارفع المشروع، ثبّت Node.js، شغّل عبر **PM2**، وضع **Nginx** + شهادة Let's Encrypt.
 
 ### بعد ربط الدومين
 
-1. أرسل `https://yourdomain.com/sitemap.xml` إلى [Google Search Console](https://search.google.com/search-console).
+1. أرسل `https://trendora1.com/sitemap.xml` إلى [Google Search Console](https://search.google.com/search-console).
 2. بعد قبول AdSense، حدّث `public/ads.txt` بمعرّف الناشر.
 
 ## Google AdSense
@@ -99,8 +114,8 @@ git push -u origin main
 ```
 trendora/
 ├── server.js          # الخادم الرئيسي + API
-├── lib/store.js       # طبقة التخزين (JSON محلياً / MongoDB عند النشر)
-├── data/articles.json # المقالات (محلياً) + بيانات أولية تُزرع في MongoDB
+├── lib/store.js       # طبقة التخزين (Firestore / MongoDB / JSON تلقائياً)
+├── data/articles.json # المقالات محلياً + بيانات أولية تُزرع في قاعدة البيانات
 ├── public/            # الملفات العامة (الموقع)
 │   ├── index.html
 │   ├── article.html
