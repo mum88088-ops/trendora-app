@@ -292,8 +292,16 @@
                         <textarea id="adsInArticle" rows="3" placeholder="كود وحدة إعلانية تظهر داخل المقالات"></textarea>
                     </div>
 
+                    <hr style="border:none;border-top:1px dashed var(--color-border);margin:8px 0 20px">
+
+                    <div class="field">
+                        <label>معرّف Google Analytics (Measurement ID)</label>
+                        <input type="text" id="analyticsId" placeholder="G-XXXXXXXXXX">
+                        <small class="field-hint">يبدأ بـ G-. يُضاف كود التتبع تلقائياً إلى جميع صفحات الموقع. شاهد الإحصائيات في <a href="https://analytics.google.com" target="_blank" rel="noopener">analytics.google.com</a></small>
+                    </div>
+
                     <div class="editor-actions">
-                        <button type="button" class="btn" id="saveAdsBtn">حفظ الإعلانات</button>
+                        <button type="button" class="btn" id="saveAdsBtn">حفظ الإعدادات</button>
                         <span class="save-msg" id="adsSaveMsg"></span>
                     </div>
                 </div>

@@ -257,6 +257,7 @@ app.get(
       categories: s.categories,
       homepageCount: s.homepageCount,
       adsense: s.adsense,
+      analyticsId: s.analyticsId || "",
       hasCustomPassword: Boolean(s.passwordHash),
     });
   })
@@ -302,11 +303,16 @@ app.put(
       };
     }
 
+    if (req.body.analyticsId !== undefined) {
+      patch.analyticsId = String(req.body.analyticsId || "").trim();
+    }
+
     const saved = await store.saveSettings(patch);
     res.json({
       categories: saved.categories,
       homepageCount: saved.homepageCount,
       adsense: saved.adsense,
+      analyticsId: saved.analyticsId,
     });
   })
 );
@@ -821,6 +827,13 @@ async function sendInjectedHtml(res, fileName, next) {
     const s = await store.getSettings();
     const ads = s.adsense || {};
     const parts = [];
+    // Google Analytics (gtag.js)
+    if (s.analyticsId) {
+      parts.push(
+        `<script async src="https://www.googletagmanager.com/gtag/js?id=${s.analyticsId}"></script>\n` +
+          `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${s.analyticsId}');</script>`
+      );
+    }
     if (ads.verification) parts.push(ads.verification);
     if (ads.clientId) {
       parts.push(

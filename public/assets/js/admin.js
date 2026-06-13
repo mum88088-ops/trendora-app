@@ -190,6 +190,7 @@ function loadAdsView() {
     $("adsVerification").value = a.verification || "";
     $("adsHeadCode").value = a.headCode || "";
     $("adsInArticle").value = a.inArticleCode || "";
+    $("analyticsId").value = siteSettings.analyticsId || "";
     $("adsSaveMsg").textContent = "";
 }
 
@@ -207,13 +208,15 @@ async function saveAds() {
                     headCode: $("adsHeadCode").value,
                     inArticleCode: $("adsInArticle").value,
                 },
+                analyticsId: $("analyticsId").value.trim(),
             }),
         });
         if (res.status === 401) return handleUnauthorized();
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "فشل الحفظ");
         siteSettings.adsense = data.adsense;
-        msg.textContent = "✓ تم حفظ أكواد الإعلانات. ستظهر على الموقع فوراً.";
+        siteSettings.analyticsId = data.analyticsId;
+        msg.textContent = "✓ تم حفظ الإعدادات. ستظهر على الموقع فوراً.";
     } catch (err) {
         msg.textContent = err.message;
     }
