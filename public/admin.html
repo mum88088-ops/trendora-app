@@ -47,6 +47,9 @@
             <button class="tab-btn active" data-view="list">المقالات</button>
             <button class="tab-btn" data-view="editor" id="newArticleTab">+ مقال جديد</button>
             <button class="tab-btn" data-view="ai">أداة الذكاء الاصطناعي</button>
+            <button class="tab-btn" data-view="categories">الأقسام</button>
+            <button class="tab-btn" data-view="ads">الإعلانات</button>
+            <button class="tab-btn" data-view="security">كلمة المرور</button>
         </nav>
 
         <main class="admin-main">
@@ -220,6 +223,99 @@
                             <button type="button" class="btn" id="useAiBtn">تحرير ونشر هذا المقال</button>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- CATEGORIES VIEW -->
+            <section class="view" id="view-categories" hidden>
+                <div class="view-head">
+                    <h2>إدارة الأقسام</h2>
+                </div>
+                <div class="settings-panel">
+                    <p class="panel-note">أضف أو احذف أقسام الموقع. تظهر الأقسام في القائمة المنسدلة وأزرار الفلترة تلقائياً.</p>
+
+                    <form id="addCategoryForm" class="inline-form">
+                        <input type="text" id="newCatIcon" class="icon-input" placeholder="📰" maxlength="4" aria-label="أيقونة">
+                        <input type="text" id="newCatName" placeholder="اسم القسم الجديد (مثال: أخبار المعاشات)" required>
+                        <button type="submit" class="btn">+ إضافة قسم</button>
+                    </form>
+
+                    <div class="field" style="max-width:320px">
+                        <label>عدد الأقسام الظاهرة في الصفحة الرئيسية</label>
+                        <input type="number" id="homepageCount" min="1" max="12" value="4">
+                        <small class="field-hint">الباقي يظهر في القائمة المنسدلة «الأقسام».</small>
+                    </div>
+
+                    <ul class="cat-list" id="catManageList"></ul>
+
+                    <div class="editor-actions">
+                        <button type="button" class="btn" id="saveCategoriesBtn">حفظ التغييرات</button>
+                        <span class="save-msg" id="catSaveMsg"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ADS VIEW -->
+            <section class="view" id="view-ads" hidden>
+                <div class="view-head">
+                    <h2>إعلانات جوجل أدسنس</h2>
+                </div>
+                <div class="settings-panel">
+                    <p class="panel-note">الصق الأكواد التي يعطيك إياها جوجل أدسنس. تُضاف تلقائياً إلى جميع صفحات الموقع.</p>
+
+                    <div class="field">
+                        <label>معرّف الناشر (Publisher ID)</label>
+                        <input type="text" id="adsClientId" placeholder="ca-pub-XXXXXXXXXXXXXXXX">
+                        <small class="field-hint">يبدأ بـ ca-pub. يُفعّل الإعلانات التلقائية ويُنشئ ملف ads.txt.</small>
+                    </div>
+
+                    <div class="field">
+                        <label>كود التحقق من ملكية الموقع (Verification)</label>
+                        <textarea id="adsVerification" rows="3" placeholder="&lt;meta name=&quot;google-adsense-account&quot; content=&quot;ca-pub-XXXX&quot;&gt;"></textarea>
+                        <small class="field-hint">الكود الذي يعطيك إياه أدسنس عند إضافة الموقع (وسم meta أو سكربت).</small>
+                    </div>
+
+                    <div class="field">
+                        <label>كود إضافي للرأس (اختياري)</label>
+                        <textarea id="adsHeadCode" rows="3" placeholder="أي كود إضافي يوضع داخل &lt;head&gt;"></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label>كود الإعلان داخل المقال (اختياري)</label>
+                        <textarea id="adsInArticle" rows="3" placeholder="كود وحدة إعلانية تظهر داخل المقالات"></textarea>
+                    </div>
+
+                    <div class="editor-actions">
+                        <button type="button" class="btn" id="saveAdsBtn">حفظ الإعلانات</button>
+                        <span class="save-msg" id="adsSaveMsg"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECURITY VIEW -->
+            <section class="view" id="view-security" hidden>
+                <div class="view-head">
+                    <h2>تغيير كلمة المرور</h2>
+                </div>
+                <div class="settings-panel">
+                    <form id="passwordForm" class="editor-form" style="max-width:460px">
+                        <div class="field">
+                            <label>كلمة المرور الحالية</label>
+                            <input type="password" id="currentPassword" autocomplete="current-password" required>
+                        </div>
+                        <div class="field">
+                            <label>كلمة المرور الجديدة</label>
+                            <input type="password" id="newPassword" autocomplete="new-password" minlength="6" required>
+                        </div>
+                        <div class="field">
+                            <label>تأكيد كلمة المرور الجديدة</label>
+                            <input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required>
+                        </div>
+                        <div class="editor-actions">
+                            <button type="submit" class="btn">تغيير كلمة المرور</button>
+                            <span class="save-msg" id="pwSaveMsg"></span>
+                        </div>
+                    </form>
                 </div>
             </section>
 

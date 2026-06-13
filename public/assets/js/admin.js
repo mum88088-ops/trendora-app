@@ -36,6 +36,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("generateBtn")?.addEventListener("click", generateAI);
     $("useAiBtn")?.addEventListener("click", useAiResult);
     $("genImageBtn")?.addEventListener("click", generateImage);
+
+    $("addCategoryForm")?.addEventListener("submit", addCategoryRow);
+    $("saveCategoriesBtn")?.addEventListener("click", saveCategories);
+    $("saveAdsBtn")?.addEventListener("click", saveAds);
+    $("passwordForm")?.addEventListener("submit", changePassword);
   } catch (err) {
     console.error("Admin init error:", err);
     const errEl = $("loginError");
@@ -84,6 +89,158 @@ function showApp() {
     $("adminApp").hidden = false;
     loadArticles();
     loadAiProviders();
+    loadSettings();
+}
+
+/* ---------- settings (categories / ads / password) ---------- */
+let siteSettings = { categories: [], homepageCount: 4, adsense: {} };
+
+async function loadSettings() {
+    try {
+        const res = await api("/api/admin/settings");
+        if (res.status === 401) return handleUnauthorized();
+        siteSettings = await res.json();
+        fillCategoryDatalist();
+    } catch {
+        /* ignore */
+    }
+}
+
+/** يملأ قائمة اقتراح التصنيفات في المحرر */
+function fillCategoryDatalist() {
+    const list = $("catList");
+    if (!list) return;
+    list.innerHTML = (siteSettings.categories || [])
+        .map((c) => `<option value="${escapeHtml(c.name)}"></option>`)
+        .join("");
+}
+
+function loadCategoriesView() {
+    $("homepageCount").value = siteSettings.homepageCount || 4;
+    renderCatManageList(siteSettings.categories || []);
+    $("catSaveMsg").textContent = "";
+}
+
+function renderCatManageList(cats) {
+    const ul = $("catManageList");
+    ul.innerHTML = cats
+        .map(
+            (c, i) => `
+        <li data-i="${i}">
+            <span class="cat-ico">${escapeHtml(c.icon || "📌")}</span>
+            <span class="cat-name">${escapeHtml(c.name)}</span>
+            <button type="button" class="cat-del" data-i="${i}">حذف</button>
+        </li>`
+        )
+        .join("");
+    ul.querySelectorAll(".cat-del").forEach((btn) =>
+        btn.addEventListener("click", () => {
+            const i = Number(btn.dataset.i);
+            siteSettings.categories.splice(i, 1);
+            renderCatManageList(siteSettings.categories);
+        })
+    );
+}
+
+function addCategoryRow(e) {
+    e.preventDefault();
+    const name = $("newCatName").value.trim();
+    const icon = $("newCatIcon").value.trim() || "📌";
+    if (!name) return;
+    if (!siteSettings.categories) siteSettings.categories = [];
+    if (siteSettings.categories.some((c) => c.name === name)) {
+        $("catSaveMsg").textContent = "هذا القسم موجود بالفعل.";
+        return;
+    }
+    siteSettings.categories.push({ name, icon });
+    $("newCatName").value = "";
+    $("newCatIcon").value = "";
+    renderCatManageList(siteSettings.categories);
+    $("catSaveMsg").textContent = "تمت الإضافة — لا تنسَ الحفظ.";
+}
+
+async function saveCategories() {
+    const msg = $("catSaveMsg");
+    msg.textContent = "جارٍ الحفظ...";
+    try {
+        const res = await api("/api/admin/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                categories: siteSettings.categories,
+                homepageCount: Number($("homepageCount").value) || 4,
+            }),
+        });
+        if (res.status === 401) return handleUnauthorized();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "فشل الحفظ");
+        siteSettings.categories = data.categories;
+        siteSettings.homepageCount = data.homepageCount;
+        fillCategoryDatalist();
+        msg.textContent = "✓ تم حفظ الأقسام بنجاح.";
+    } catch (err) {
+        msg.textContent = err.message;
+    }
+}
+
+function loadAdsView() {
+    const a = siteSettings.adsense || {};
+    $("adsClientId").value = a.clientId || "";
+    $("adsVerification").value = a.verification || "";
+    $("adsHeadCode").value = a.headCode || "";
+    $("adsInArticle").value = a.inArticleCode || "";
+    $("adsSaveMsg").textContent = "";
+}
+
+async function saveAds() {
+    const msg = $("adsSaveMsg");
+    msg.textContent = "جارٍ الحفظ...";
+    try {
+        const res = await api("/api/admin/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                adsense: {
+                    clientId: $("adsClientId").value.trim(),
+                    verification: $("adsVerification").value,
+                    headCode: $("adsHeadCode").value,
+                    inArticleCode: $("adsInArticle").value,
+                },
+            }),
+        });
+        if (res.status === 401) return handleUnauthorized();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "فشل الحفظ");
+        siteSettings.adsense = data.adsense;
+        msg.textContent = "✓ تم حفظ أكواد الإعلانات. ستظهر على الموقع فوراً.";
+    } catch (err) {
+        msg.textContent = err.message;
+    }
+}
+
+async function changePassword(e) {
+    e.preventDefault();
+    const msg = $("pwSaveMsg");
+    const next = $("newPassword").value;
+    const confirm = $("confirmPassword").value;
+    if (next !== confirm) {
+        msg.textContent = "كلمتا المرور غير متطابقتين.";
+        return;
+    }
+    msg.textContent = "جارٍ التغيير...";
+    try {
+        const res = await api("/api/admin/password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ current: $("currentPassword").value, next }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "فشل التغيير");
+        $("passwordForm").reset();
+        msg.textContent = "✓ تم تغيير كلمة المرور بنجاح.";
+    } catch (err) {
+        msg.textContent = err.message;
+    }
 }
 
 /** يعيد المستخدم لشاشة الدخول إذا انتهت الجلسة (مثلاً بعد إعادة نشر Render) */
@@ -97,8 +254,12 @@ function handleUnauthorized() {
 function switchView(view, btn) {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     if (btn) btn.classList.add("active");
-    ["list", "editor", "ai"].forEach((v) => ($(`view-${v}`).hidden = v !== view));
+    ["list", "editor", "ai", "categories", "ads", "security"].forEach(
+        (v) => ($(`view-${v}`).hidden = v !== view)
+    );
     if (view === "list") loadArticles();
+    if (view === "categories") loadCategoriesView();
+    if (view === "ads") loadAdsView();
 }
 function switchTo(view) {
     const btn = document.querySelector(`.tab-btn[data-view="${view}"]`);

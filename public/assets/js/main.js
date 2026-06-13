@@ -1,26 +1,16 @@
 /* ===== Trendora — Homepage logic ===== */
 
-/* قائمة الأقسام الموحّدة (تُستخدم في القائمة المنسدلة وأزرار الفلترة) */
-const CATEGORIES = [
+/* أقسام افتراضية تُستبدل بإعدادات الموقع من /api/settings */
+let CATEGORIES = [
     { name: "آخر الأخبار", icon: "📰" },
     { name: "التعليم", icon: "🎓" },
     { name: "المعاشات", icon: "👴" },
     { name: "المرتبات والأجور", icon: "💰" },
-    { name: "الوظائف والتوظيف", icon: "💼" },
-    { name: "الاقتصاد والأسواق", icon: "📈" },
-    { name: "أسعار الذهب والعملات", icon: "🪙" },
-    { name: "الخدمات الحكومية", icon: "🏛️" },
-    { name: "الصحة", icon: "🩺" },
-    { name: "التقنية", icon: "💻" },
-    { name: "الرياضة", icon: "⚽" },
-    { name: "الفن والمشاهير", icon: "🎬" },
-    { name: "السيارات", icon: "🚗" },
-    { name: "الطقس", icon: "☀️" },
-    { name: "أسلوب حياة", icon: "🌿" },
-    { name: "عام", icon: "📌" },
 ];
+let HOMEPAGE_COUNT = 4;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadSiteSettings();
     populateCategoryMenus();
     populateFilters();
     initNav();
@@ -34,16 +24,18 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentCat = params.get("cat") || "all";
     let currentQuery = "";
 
-    // sync active filter button with URL
-    document.querySelectorAll(".filter-btn").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.cat === currentCat);
-        btn.addEventListener("click", () => {
-            currentCat = btn.dataset.cat;
-            document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
-            loadArticles(currentCat, currentQuery);
+    bindFilterButtons();
+    function bindFilterButtons() {
+        document.querySelectorAll(".filter-btn").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.cat === currentCat);
+            btn.addEventListener("click", () => {
+                currentCat = btn.dataset.cat;
+                document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+                loadArticles(currentCat, currentQuery);
+            });
         });
-    });
+    }
 
     const search = document.getElementById("searchInput");
     if (search) {
@@ -104,13 +96,27 @@ function renderArticles(articles) {
 
 /* ===== shared helpers ===== */
 
-/* يملأ كل قوائم "الأقسام" المنسدلة في الصفحات تلقائياً */
+/* يجلب أقسام الموقع من الخادم (مع التراجع للأقسام الافتراضية عند الفشل) */
+async function loadSiteSettings() {
+    try {
+        const res = await fetch("/api/settings");
+        const data = await res.json();
+        if (Array.isArray(data.categories) && data.categories.length) {
+            CATEGORIES = data.categories;
+        }
+        if (data.homepageCount) HOMEPAGE_COUNT = data.homepageCount;
+    } catch {
+        /* يبقى الافتراضي */
+    }
+}
+
+/* يملأ كل قوائم "الأقسام" المنسدلة في الصفحات تلقائياً (كل الأقسام) */
 function populateCategoryMenus() {
     const menus = document.querySelectorAll(".dropdown-menu");
     if (!menus.length) return;
     const itemsHtml = CATEGORIES.map(
         (c) =>
-            `<li><a href="/?cat=${encodeURIComponent(c.name)}"><span class="cat-ico">${c.icon}</span> ${escapeHtml(c.name)}</a></li>`
+            `<li><a href="/?cat=${encodeURIComponent(c.name)}"><span class="cat-ico">${c.icon || "📌"}</span> ${escapeHtml(c.name)}</a></li>`
     ).join("");
     menus.forEach((menu) => {
         menu.innerHTML = itemsHtml;
@@ -118,16 +124,19 @@ function populateCategoryMenus() {
     });
 }
 
-/* يبني أزرار الفلترة في الصفحة الرئيسية (الكل + الأقسام) */
+/* يبني أزرار الفلترة في الصفحة الرئيسية: الكل + أول HOMEPAGE_COUNT أقسام فقط */
 function populateFilters() {
     const filters = document.getElementById("filters");
     if (!filters) return;
+    const shown = CATEGORIES.slice(0, HOMEPAGE_COUNT);
     filters.innerHTML =
         `<button class="filter-btn active" data-cat="all">الكل</button>` +
-        CATEGORIES.map(
-            (c) =>
-                `<button class="filter-btn" data-cat="${escapeAttr(c.name)}"><span class="cat-ico">${c.icon}</span> ${escapeHtml(c.name)}</button>`
-        ).join("");
+        shown
+            .map(
+                (c) =>
+                    `<button class="filter-btn" data-cat="${escapeAttr(c.name)}"><span class="cat-ico">${c.icon || "📌"}</span> ${escapeHtml(c.name)}</button>`
+            )
+            .join("");
 }
 
 function initNav() {

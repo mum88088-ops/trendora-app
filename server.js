@@ -4,6 +4,7 @@ import multer from "multer";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { createStore } from "./lib/store.js";
 
@@ -83,6 +84,28 @@ function requireAuth(req, res, next) {
   return res.status(401).json({ error: "غير مصرح. يرجى تسجيل الدخول." });
 }
 
+/* ---------- password hashing (scrypt) ---------- */
+function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return { hash, salt };
+}
+function verifyPasswordHash(password, hash, salt) {
+  if (!hash || !salt) return false;
+  const candidate = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  const a = Buffer.from(candidate, "hex");
+  const b = Buffer.from(hash, "hex");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** يتحقق من كلمة المرور: المخزّنة في الإعدادات لها الأولوية، وإلا متغيّر البيئة */
+async function checkPassword(password) {
+  const settings = await store.getSettings();
+  if (settings.passwordHash && settings.passwordSalt) {
+    return verifyPasswordHash(password, settings.passwordHash, settings.passwordSalt);
+  }
+  return password === ADMIN_PASSWORD;
+}
+
 /* ---------- async route wrapper ---------- */
 const wrap = (fn) => (req, res) =>
   Promise.resolve(fn(req, res)).catch((err) => {
@@ -114,17 +137,39 @@ app.get(
   })
 );
 
+/* الإعدادات العامة (أقسام + إعلانات) — تُستخدم في الواجهة */
+app.get(
+  "/api/settings",
+  wrap(async (req, res) => {
+    const s = await store.getSettings();
+    res.set("Cache-Control", "no-store");
+    res.json({
+      categories: s.categories,
+      homepageCount: s.homepageCount,
+      adsense: {
+        clientId: s.adsense.clientId || "",
+        verification: s.adsense.verification || "",
+        headCode: s.adsense.headCode || "",
+        inArticleCode: s.adsense.inArticleCode || "",
+      },
+    });
+  })
+);
+
 /* ============================================================
    AUTH API
    ============================================================ */
-app.post("/api/login", (req, res) => {
-  const { password } = req.body || {};
-  if (password === ADMIN_PASSWORD) {
-    req.session.isAdmin = true;
-    return res.json({ ok: true });
-  }
-  res.status(401).json({ error: "كلمة المرور غير صحيحة" });
-});
+app.post(
+  "/api/login",
+  wrap(async (req, res) => {
+    const { password } = req.body || {};
+    if (await checkPassword(password)) {
+      req.session.isAdmin = true;
+      return res.json({ ok: true });
+    }
+    res.status(401).json({ error: "كلمة المرور غير صحيحة" });
+  })
+);
 
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
@@ -198,6 +243,87 @@ app.delete(
   wrap(async (req, res) => {
     const removed = await store.remove(req.params.id);
     if (!removed) return res.status(404).json({ error: "المقال غير موجود" });
+    res.json({ ok: true });
+  })
+);
+
+/* ---------- settings management (protected) ---------- */
+app.get(
+  "/api/admin/settings",
+  requireAuth,
+  wrap(async (req, res) => {
+    const s = await store.getSettings();
+    res.json({
+      categories: s.categories,
+      homepageCount: s.homepageCount,
+      adsense: s.adsense,
+      hasCustomPassword: Boolean(s.passwordHash),
+    });
+  })
+);
+
+app.put(
+  "/api/admin/settings",
+  requireAuth,
+  wrap(async (req, res) => {
+    const { categories, homepageCount, adsense } = req.body || {};
+    const patch = {};
+
+    if (Array.isArray(categories)) {
+      const clean = categories
+        .map((c) => ({
+          name: String(c.name || "").trim(),
+          icon: String(c.icon || "📌").trim().slice(0, 4) || "📌",
+        }))
+        .filter((c) => c.name);
+      // إزالة التكرار حسب الاسم
+      const seen = new Set();
+      patch.categories = clean.filter((c) => {
+        if (seen.has(c.name)) return false;
+        seen.add(c.name);
+        return true;
+      });
+      if (!patch.categories.length) {
+        return res.status(400).json({ error: "يجب إبقاء قسم واحد على الأقل" });
+      }
+    }
+
+    if (homepageCount !== undefined) {
+      const n = Math.max(1, Math.min(12, Number(homepageCount) || 4));
+      patch.homepageCount = n;
+    }
+
+    if (adsense && typeof adsense === "object") {
+      patch.adsense = {
+        clientId: String(adsense.clientId || "").trim(),
+        verification: String(adsense.verification || "").trim(),
+        headCode: String(adsense.headCode || ""),
+        inArticleCode: String(adsense.inArticleCode || ""),
+      };
+    }
+
+    const saved = await store.saveSettings(patch);
+    res.json({
+      categories: saved.categories,
+      homepageCount: saved.homepageCount,
+      adsense: saved.adsense,
+    });
+  })
+);
+
+app.post(
+  "/api/admin/password",
+  requireAuth,
+  wrap(async (req, res) => {
+    const { current, next } = req.body || {};
+    if (!next || String(next).length < 6) {
+      return res.status(400).json({ error: "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل" });
+    }
+    if (!(await checkPassword(current))) {
+      return res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
+    }
+    const { hash, salt } = hashPassword(next);
+    await store.saveSettings({ passwordHash: hash, passwordSalt: salt });
     res.json({ ok: true });
   })
 );
@@ -617,13 +743,65 @@ app.get(
   })
 );
 
-/* ---------- static files ---------- */
-app.use(express.static(path.join(__dirname, "public")));
+/* ---------- HTML pages with AdSense injection ---------- */
+const PUBLIC_DIR = path.join(__dirname, "public");
+const INJECT_PAGES = new Set([
+  "index.html",
+  "article.html",
+  "about.html",
+  "contact.html",
+  "privacy.html",
+  "terms.html",
+]);
 
-// nice URL for single article: /article/:slug
-app.get("/article/:slug", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "article.html"));
+async function sendInjectedHtml(res, fileName, next) {
+  try {
+    const filePath = path.join(PUBLIC_DIR, fileName);
+    let html = await fs.promises.readFile(filePath, "utf-8");
+    const s = await store.getSettings();
+    const ads = s.adsense || {};
+    const parts = [];
+    if (ads.verification) parts.push(ads.verification);
+    if (ads.clientId) {
+      parts.push(
+        `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ads.clientId}" crossorigin="anonymous"></script>`
+      );
+    }
+    if (ads.headCode) parts.push(ads.headCode);
+    html = html.replace("<!--ADSENSE_HEAD-->", parts.join("\n"));
+    res.type("html").send(html);
+  } catch (err) {
+    next ? next(err) : res.status(500).send("Error");
+  }
+}
+
+app.get("/", (req, res, next) => sendInjectedHtml(res, "index.html", next));
+app.get("/article/:slug", (req, res, next) =>
+  sendInjectedHtml(res, "article.html", next)
+);
+app.get("/:page.html", (req, res, next) => {
+  const file = `${req.params.page}.html`;
+  if (INJECT_PAGES.has(file)) return sendInjectedHtml(res, file, next);
+  next();
 });
+
+/* ---------- dynamic ads.txt (from AdSense client id) ---------- */
+app.get("/ads.txt", (req, res, next) => {
+  store
+    .getSettings()
+    .then((s) => {
+      const pub = (s.adsense.clientId || "").replace(/^ca-/, "");
+      if (pub) {
+        res.type("text/plain").send(`google.com, ${pub}, DIRECT, f08c47fec0942fa0\n`);
+      } else {
+        next();
+      }
+    })
+    .catch(next);
+});
+
+/* ---------- static files ---------- */
+app.use(express.static(PUBLIC_DIR));
 
 app.listen(PORT, () => {
   console.log(`\n  ✅ Trendora يعمل الآن على: http://localhost:${PORT}`);

@@ -221,6 +221,49 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== Settings panels (categories / ads / security) ===== */
+.settings-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 24px;
+}
+.panel-note { color: var(--color-muted); margin-bottom: 18px; }
+.inline-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.inline-form input[type="text"] {
+    padding: 10px 12px; border: 1px solid var(--color-border);
+    border-radius: 10px; font-family: var(--font-body); outline: none;
+}
+.inline-form input[type="text"]:focus { border-color: var(--color-primary); }
+.inline-form input#newCatName { flex: 1; min-width: 220px; }
+.icon-input { width: 64px; text-align: center; font-size: 1.1rem; }
+
+.cat-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 8px 0 20px; }
+.cat-list li {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border: 1px solid var(--color-border);
+    border-radius: 10px; background: #fafbff;
+}
+.cat-list .cat-ico { font-size: 1.2rem; }
+.cat-list .cat-name { flex: 1; font-weight: 600; }
+.cat-list .cat-del {
+    background: none; border: none; color: #dc2626; cursor: pointer;
+    font-weight: 700; font-family: var(--font-body); padding: 4px 10px;
+    border-radius: 8px; transition: background .2s;
+}
+.cat-list .cat-del:hover { background: #fee2e2; }
+
+.settings-panel textarea {
+    width: 100%; padding: 12px 14px; border: 1px solid var(--color-border);
+    border-radius: 10px; font-family: monospace; font-size: 0.88rem;
+    outline: none; resize: vertical; direction: ltr;
+}
+.settings-panel textarea:focus, .settings-panel input:focus { border-color: var(--color-primary); }
+.settings-panel input[type="text"], .settings-panel input[type="number"], .settings-panel input[type="password"] {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--color-border);
+    border-radius: 10px; font-family: var(--font-body); outline: none;
+}
+
 @media (max-width: 640px) {
     .field-row { grid-template-columns: 1fr; }
     .articles-table th:nth-child(2), .articles-table td:nth-child(2),
