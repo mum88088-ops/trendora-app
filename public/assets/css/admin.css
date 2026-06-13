@@ -198,6 +198,8 @@
     border-radius: 10px; font-family: var(--font-body); outline: none;
 }
 .img-pane input:focus { border-color: var(--color-primary); }
+.url-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.url-row input[type="url"] { flex: 1; min-width: 200px; }
 
 .ai-image-box { margin-top: 14px; border-top: 1px dashed var(--color-border); padding-top: 14px; }
 .ai-image-box > small { color: var(--color-muted); display: block; margin-bottom: 8px; }

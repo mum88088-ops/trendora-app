@@ -28,7 +28,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("uploadImageBtn")?.addEventListener("click", () => $("fImageFile")?.click());
     $("fImageFile")?.addEventListener("change", uploadImage);
     $("removeImageBtn")?.addEventListener("click", () => setImage(""));
-    $("fImageUrl")?.addEventListener("input", (e) => setImage(e.target.value.trim()));
+    $("previewUrlBtn")?.addEventListener("click", previewUrlImage);
+    $("fImageUrl")?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); previewUrlImage(); }
+    });
+    $("insertImageBtn")?.addEventListener("click", insertImageIntoContent);
     document.querySelectorAll(".img-tab").forEach((btn) =>
         btn.addEventListener("click", () => switchImageTab(btn.dataset.imgtab))
     );
@@ -558,6 +562,53 @@ async function saveArticle(e) {
 }
 
 /* ---------- image ---------- */
+/** يعاين رابط الصورة ويتحقق من تحميلها قبل اعتمادها كصورة للمقال */
+function previewUrlImage() {
+    const url = ($("fImageUrl")?.value || "").trim();
+    const status = $("urlImageStatus");
+    if (!url) {
+        if (status) { status.textContent = "الصق رابط صورة أولاً."; status.className = "ai-status err"; }
+        return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+        if (status) { status.textContent = "الرابط يجب أن يبدأ بـ http أو https."; status.className = "ai-status err"; }
+        return;
+    }
+    if (status) { status.textContent = "جارٍ التحقق من الصورة..."; status.className = "ai-status"; }
+    const test = new Image();
+    test.onload = () => {
+        setImage(url);
+        if (status) { status.textContent = "✓ تم تحميل الصورة وحفظها كصورة للمقال."; status.className = "ai-status ok"; }
+    };
+    test.onerror = () => {
+        if (status) {
+            status.textContent = "تعذّر تحميل الصورة من هذا الرابط. تأكد أنه رابط مباشر لصورة (ينتهي بـ .jpg أو .png).";
+            status.className = "ai-status err";
+        }
+    };
+    test.src = url;
+}
+
+/** يدرج صورة داخل محتوى المقال عند موضع المؤشر */
+function insertImageIntoContent() {
+    const url = prompt("الصق رابط الصورة المراد إدراجها داخل المقال:");
+    if (!url) return;
+    const clean = url.trim();
+    if (!/^https?:\/\//i.test(clean)) {
+        alert("الرابط يجب أن يبدأ بـ http أو https");
+        return;
+    }
+    const caption = prompt("نص توضيحي للصورة (اختياري):") || "";
+    const figure = caption
+        ? `\n<figure>\n  <img src="${clean}" alt="${caption.replace(/"/g, "&quot;")}" loading="lazy">\n  <figcaption>${caption}</figcaption>\n</figure>\n`
+        : `\n<img src="${clean}" alt="صورة توضيحية" loading="lazy">\n`;
+    const ta = $("fContent");
+    const start = ta.selectionStart;
+    ta.value = ta.value.slice(0, start) + figure + ta.value.slice(ta.selectionEnd);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = start + figure.length;
+}
+
 function switchImageTab(tab) {
     document.querySelectorAll(".img-tab").forEach((b) =>
         b.classList.toggle("active", b.dataset.imgtab === tab)

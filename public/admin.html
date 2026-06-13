@@ -147,8 +147,12 @@
 
                         <!-- تبويب: رابط خارجي (الأفضل بدون Storage) -->
                         <div class="img-pane" id="imgpane-url">
-                            <input type="url" id="fImageUrl" placeholder="https://example.com/image.jpg">
-                            <small class="field-hint">الصق رابط صورة مباشر (ينتهي غالباً بـ .jpg أو .png). مصادر مجانية: 
+                            <div class="url-row">
+                                <input type="url" id="fImageUrl" placeholder="https://example.com/image.jpg">
+                                <button type="button" class="btn-ghost" id="previewUrlBtn">معاينة وحفظ</button>
+                            </div>
+                            <small class="ai-status" id="urlImageStatus"></small>
+                            <small class="field-hint">الصق رابط صورة مباشر ثم اضغط «معاينة وحفظ». مصادر مجانية: 
                                 <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a> ·
                                 <a href="https://www.pexels.com/ar-ar/" target="_blank" rel="noopener">Pexels</a> ·
                                 <a href="https://pixabay.com/ar/" target="_blank" rel="noopener">Pixabay</a>.
@@ -181,8 +185,10 @@
                             <button type="button" data-tag="p">فقرة</button>
                             <button type="button" data-tag="ul">قائمة</button>
                             <button type="button" data-tag="blockquote">اقتباس</button>
+                            <button type="button" id="insertImageBtn">🖼️ إدراج صورة</button>
                         </div>
                         <textarea id="fContent" rows="16" placeholder="<p>اكتب المحتوى هنا...</p>" required></textarea>
+                        <small class="field-hint">لإدراج صورة داخل المقال: ضع المؤشر في المكان المطلوب ثم اضغط «إدراج صورة» والصق رابطها.</small>
                     </div>
 
                     <div class="field">
