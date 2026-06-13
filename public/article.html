@@ -46,8 +46,15 @@
             <nav class="main-nav" id="mainNav">
                 <ul>
                     <li><a href="/">الرئيسية</a></li>
-                    <li><a href="/?cat=التقنية">التقنية</a></li>
-                    <li><a href="/?cat=الصحة">الصحة</a></li>
+                    <li class="has-dropdown">
+                        <button type="button" class="dropdown-toggle" aria-haspopup="true" aria-expanded="false">الأقسام <span class="caret">▾</span></button>
+                        <ul class="dropdown-menu">
+                            <li><a href="/?cat=التقنية">التقنية</a></li>
+                            <li><a href="/?cat=الصحة">الصحة</a></li>
+                            <li><a href="/?cat=عام">عام</a></li>
+                            <li><a href="/?cat=أسلوب حياة">أسلوب حياة</a></li>
+                        </ul>
+                    </li>
                     <li><a href="/about.html">من نحن</a></li>
                     <li><a href="/contact.html">اتصل بنا</a></li>
                 </ul>
@@ -60,14 +67,33 @@
             <a href="/">الرئيسية</a> &laquo; <span id="crumbCat">المقال</span>
         </nav>
 
-        <article class="single-article" id="articleContainer">
-            <p class="empty-state">جارٍ تحميل المقال...</p>
-        </article>
+        <div class="article-layout">
+            <div class="article-main">
+                <article class="single-article" id="articleContainer">
+                    <p class="empty-state">جارٍ تحميل المقال...</p>
+                </article>
 
-        <section class="related-articles">
-            <h2 class="section-title">مقالات ذات صلة</h2>
-            <div class="article-grid" id="relatedGrid"></div>
-        </section>
+                <section class="related-articles">
+                    <h2 class="section-title">مقالات ذات صلة</h2>
+                    <div class="article-grid" id="relatedGrid"></div>
+                </section>
+            </div>
+
+            <aside class="article-sidebar" aria-label="مقالات مقترحة">
+                <div class="sidebar-widget">
+                    <h3>🆕 أحدث المقالات</h3>
+                    <ul id="sbNewest"><li class="sb-empty">جارٍ التحميل...</li></ul>
+                </div>
+                <div class="sidebar-widget">
+                    <h3>⭐ مقالات مهمة</h3>
+                    <ul id="sbImportant"><li class="sb-empty">جارٍ التحميل...</li></ul>
+                </div>
+                <div class="sidebar-widget">
+                    <h3>🔗 مقالات شبيهة</h3>
+                    <ul id="sbSimilar"><li class="sb-empty">جارٍ التحميل...</li></ul>
+                </div>
+            </aside>
+        </div>
     </main>
 
     <footer class="site-footer">

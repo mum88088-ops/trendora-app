@@ -182,6 +182,14 @@
 .image-actions { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
 .image-actions small { color: var(--color-muted); margin-top: 4px; }
 
+.ai-image-box { margin-top: 14px; border-top: 1px dashed var(--color-border); padding-top: 14px; }
+.ai-image-box > small { color: var(--color-muted); display: block; margin-bottom: 8px; }
+.ai-image-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ai-image-row input[type="text"] { flex: 1; min-width: 180px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; font-family: var(--font-body); outline: none; }
+.ai-image-row input[type="text"]:focus { border-color: var(--color-primary); }
+.ai-image-row select { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; font-family: var(--font-body); background: #fff; }
+.ai-image-box .ai-status { display: block; margin-top: 8px; }
+
 .editor-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .save-msg { font-size: 0.9rem; font-weight: 600; }
 .save-msg.ok { color: #15803d; }
@@ -190,6 +198,7 @@
 /* ----- AI panel ----- */
 .ai-status { font-size: 0.92rem; color: var(--color-muted); min-height: 20px; }
 .ai-status.err { color: #dc2626; }
+.ai-status.ok { color: #15803d; }
 .ai-result { border-top: 1px solid var(--color-border); padding-top: 18px; }
 .ai-result h3 { font-family: var(--font-head); margin-bottom: 12px; }
 .ai-preview {

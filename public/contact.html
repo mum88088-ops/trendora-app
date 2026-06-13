@@ -23,8 +23,15 @@
             <nav class="main-nav" id="mainNav">
                 <ul>
                     <li><a href="/">الرئيسية</a></li>
-                    <li><a href="/?cat=التقنية">التقنية</a></li>
-                    <li><a href="/?cat=الصحة">الصحة</a></li>
+                    <li class="has-dropdown">
+                        <button type="button" class="dropdown-toggle" aria-haspopup="true" aria-expanded="false">الأقسام <span class="caret">▾</span></button>
+                        <ul class="dropdown-menu">
+                            <li><a href="/?cat=التقنية">التقنية</a></li>
+                            <li><a href="/?cat=الصحة">الصحة</a></li>
+                            <li><a href="/?cat=عام">عام</a></li>
+                            <li><a href="/?cat=أسلوب حياة">أسلوب حياة</a></li>
+                        </ul>
+                    </li>
                     <li><a href="/about.html">من نحن</a></li>
                     <li><a href="/contact.html" class="active">اتصل بنا</a></li>
                 </ul>

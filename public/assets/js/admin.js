@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     $("generateBtn")?.addEventListener("click", generateAI);
     $("useAiBtn")?.addEventListener("click", useAiResult);
+    $("genImageBtn")?.addEventListener("click", generateImage);
   } catch (err) {
     console.error("Admin init error:", err);
     const errEl = $("loginError");
@@ -291,34 +292,76 @@ function insertSnippet(tag) {
 /* ---------- AI ---------- */
 let lastAi = null;
 
-/** يحمّل أدوات الذكاء المتاحة (OpenAI / Gemini) ويملأ القائمة */
+/** يحمّل أدوات الذكاء المتاحة (OpenAI / Gemini) ويملأ القوائم */
 async function loadAiProviders() {
     const select = $("aiProvider");
+    const imgSelect = $("aiImageProvider");
     const hint = $("aiProviderHint");
-    if (!select) return;
     try {
         const res = await api("/api/admin/ai/providers");
         if (res.status === 401) return handleUnauthorized();
         const { providers } = await res.json();
-        select.innerHTML = "";
-        providers.forEach((p) => {
-            const opt = document.createElement("option");
-            opt.value = p.id;
-            opt.textContent = p.available ? p.name : `${p.name} (غير مفعّل)`;
-            opt.disabled = !p.available;
-            select.appendChild(opt);
-        });
-        // اختر أول مزوّد متاح
+
+        const fill = (el) => {
+            if (!el) return;
+            el.innerHTML = "";
+            providers.forEach((p) => {
+                const opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = p.available ? p.name : `${p.name} (غير مفعّل)`;
+                opt.disabled = !p.available;
+                el.appendChild(opt);
+            });
+            const firstAvailable = providers.find((p) => p.available);
+            if (firstAvailable) el.value = firstAvailable.id;
+        };
+        fill(select);
+        fill(imgSelect);
+
         const firstAvailable = providers.find((p) => p.available);
-        if (firstAvailable) {
-            select.value = firstAvailable.id;
-            if (hint) hint.textContent = "";
-        } else if (hint) {
-            hint.textContent = "لا توجد أداة مفعّلة. أضف GEMINI_API_KEY (مجاني) أو OPENAI_API_KEY في إعدادات الخادم.";
-            hint.className = "field-hint warn";
+        if (hint) {
+            if (firstAvailable) {
+                hint.textContent = "";
+                hint.className = "field-hint";
+            } else {
+                hint.textContent = "لا توجد أداة مفعّلة. أضف GEMINI_API_KEY (مجاني) أو OPENAI_API_KEY في إعدادات الخادم.";
+                hint.className = "field-hint warn";
+            }
         }
     } catch {
-        select.innerHTML = `<option value="">تعذّر تحميل الأدوات</option>`;
+        if (select) select.innerHTML = `<option value="">تعذّر تحميل الأدوات</option>`;
+        if (imgSelect) imgSelect.innerHTML = `<option value="">تعذّر التحميل</option>`;
+    }
+}
+
+/** توليد صورة للمقال بالذكاء الاصطناعي */
+async function generateImage() {
+    const promptInput = $("aiImagePrompt");
+    const status = $("aiImageStatus");
+    const btn = $("genImageBtn");
+    const provider = $("aiImageProvider")?.value || "";
+    const prompt = (promptInput?.value.trim()) || $("fTitle")?.value.trim();
+    if (!prompt) {
+        if (status) { status.textContent = "اكتب وصفاً للصورة أو عنواناً للمقال أولاً."; status.className = "ai-status err"; }
+        return;
+    }
+    if (btn) { btn.disabled = true; }
+    if (status) { status.innerHTML = 'جارٍ توليد الصورة... قد يستغرق حتى 30 ثانية <span class="spinner"></span>'; status.className = "ai-status"; }
+    try {
+        const res = await api("/api/admin/ai/image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, provider }),
+        });
+        if (res.status === 401) return handleUnauthorized();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "فشل توليد الصورة");
+        setImage(data.url);
+        if (status) { status.textContent = "✓ تم توليد الصورة وتعيينها كصورة للمقال."; status.className = "ai-status ok"; }
+    } catch (err) {
+        if (status) { status.textContent = err.message; status.className = "ai-status err"; }
+    } finally {
+        if (btn) { btn.disabled = false; }
     }
 }
 

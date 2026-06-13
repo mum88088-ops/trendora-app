@@ -2,6 +2,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     initNav();
+    initContentModals();
     setYear();
 
     const grid = document.getElementById("articleGrid");
@@ -89,11 +90,106 @@ function initNav() {
             navToggle.setAttribute("aria-expanded", open ? "true" : "false");
         });
     }
+
+    // القوائم المنسدلة (الأقسام)
+    const dropdowns = document.querySelectorAll(".has-dropdown");
+    dropdowns.forEach((dd) => {
+        const toggle = dd.querySelector(".dropdown-toggle");
+        if (!toggle) return;
+        toggle.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpen = dd.classList.contains("open");
+            dropdowns.forEach((d) => d.classList.remove("open"));
+            dd.classList.toggle("open", !isOpen);
+            toggle.setAttribute("aria-expanded", !isOpen ? "true" : "false");
+        });
+    });
+    // إغلاق القوائم عند النقر خارجها
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest(".has-dropdown")) {
+            dropdowns.forEach((d) => d.classList.remove("open"));
+        }
+    });
 }
 
 function setYear() {
     const el = document.getElementById("year");
     if (el) el.textContent = new Date().getFullYear();
+}
+
+/* ===== Modal popups for content pages (about/contact/privacy/terms) =====
+   نُبقي على الصفحات الحقيقية لمحركات البحث وأدسنس، لكن عند توفّر JS نفتحها
+   كنافذة منبثقة لتجربة أسرع وأسهل دون مغادرة الصفحة. */
+const MODAL_PAGES = ["about.html", "contact.html", "privacy.html", "terms.html"];
+
+function initContentModals() {
+    const modal = buildModal();
+    document.addEventListener("click", (e) => {
+        const link = e.target.closest("a");
+        if (!link) return;
+        const href = link.getAttribute("href") || "";
+        // تجاهل الروابط الخارجية أو ذات الأهداف الخاصة
+        if (link.target === "_blank" || link.hasAttribute("data-no-modal")) return;
+        let url;
+        try { url = new URL(href, location.href); } catch { return; }
+        if (url.origin !== location.origin) return;
+        const file = url.pathname.split("/").pop();
+        if (!MODAL_PAGES.includes(file)) return;
+        e.preventDefault();
+        openModal(modal, url.href, link.textContent.trim());
+    });
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal(modal);
+    });
+}
+
+function buildModal() {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.setAttribute("hidden", "");
+    overlay.innerHTML = `
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <button class="modal-close" aria-label="إغلاق">&times;</button>
+            <h2 class="modal-title" id="modalTitle"></h2>
+            <div class="modal-body"><p class="empty-state">جارٍ التحميل...</p></div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeModal(overlay);
+    });
+    overlay.querySelector(".modal-close").addEventListener("click", () => closeModal(overlay));
+    return overlay;
+}
+
+async function openModal(overlay, href, title) {
+    const body = overlay.querySelector(".modal-body");
+    const titleEl = overlay.querySelector(".modal-title");
+    titleEl.textContent = title || "";
+    body.innerHTML = `<p class="empty-state">جارٍ التحميل...</p>`;
+    overlay.removeAttribute("hidden");
+    document.body.classList.add("modal-open");
+    try {
+        const res = await fetch(href);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const content = doc.querySelector(".page-content");
+        if (content) {
+            const h1 = content.querySelector("h1");
+            if (h1) { titleEl.textContent = h1.textContent.trim(); h1.remove(); }
+            body.innerHTML = content.innerHTML;
+        } else {
+            body.innerHTML = `<p class="empty-state">تعذّر تحميل المحتوى. <a href="${href}">فتح الصفحة</a></p>`;
+        }
+        body.scrollTop = 0;
+    } catch {
+        body.innerHTML = `<p class="empty-state">تعذّر تحميل المحتوى. <a href="${href}">فتح الصفحة</a></p>`;
+    }
+}
+
+function closeModal(overlay) {
+    overlay.setAttribute("hidden", "");
+    document.body.classList.remove("modal-open");
 }
 
 function formatDate(iso) {

@@ -7,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
     loadArticle(slug);
-    loadRelated(slug);
 });
 
 function getSlug() {
@@ -26,6 +25,7 @@ async function loadArticle(slug) {
         const { article } = await res.json();
         renderArticle(article);
         updateSeo(article);
+        loadSidebars(article);
     } catch {
         showError("المقال غير موجود أو غير منشور.");
     }
@@ -103,34 +103,91 @@ function updateSeo(a) {
     if (el) el.textContent = JSON.stringify(jsonLd);
 }
 
-async function loadRelated(currentSlug) {
-    const grid = document.getElementById("relatedGrid");
+// يجلب كل المقالات مرة واحدة ويملأ: المقالات ذات الصلة + الشريط الجانبي
+async function loadSidebars(current) {
+    let articles = [];
     try {
         const res = await fetch("/api/articles");
-        const { articles } = await res.json();
-        const related = articles.filter((a) => a.slug !== currentSlug).slice(0, 3);
-        if (!related.length) {
-            grid.innerHTML = `<div class="empty-state">لا توجد مقالات أخرى.</div>`;
-            return;
-        }
-        grid.innerHTML = related
-            .map((a) => {
-                const img = a.image
-                    ? `<div class="card-image" style="background-image:url('${a.image}')"></div>`
-                    : `<div class="card-image placeholder"></div>`;
-                return `
-                <article class="article-card">
-                    <a href="/article/${encodeURIComponent(a.slug)}">${img}</a>
-                    <div class="card-body">
-                        <span class="card-category">${escapeHtml(a.category)}</span>
-                        <h3 class="card-title"><a href="/article/${encodeURIComponent(a.slug)}">${escapeHtml(a.title)}</a></h3>
-                    </div>
-                </article>`;
-            })
-            .join("");
+        articles = (await res.json()).articles || [];
     } catch {
-        grid.innerHTML = "";
+        articles = [];
     }
+
+    const others = articles.filter((a) => a.slug !== current.slug);
+    const sameCat = others.filter((a) => a.category === current.category);
+    const byDateDesc = [...others].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
+
+    // مقالات ذات صلة (نفس القسم أولاً)
+    const related = (sameCat.length ? sameCat : byDateDesc).slice(0, 3);
+    renderRelatedGrid(related);
+
+    // الشريط الجانبي
+    renderSidebarList("sbNewest", byDateDesc.slice(0, 5));
+    renderSidebarList("sbSimilar", (sameCat.length ? sameCat : byDateDesc).slice(0, 5));
+    renderSidebarList("sbImportant", pickImportant(others, byDateDesc).slice(0, 5));
+}
+
+// "مقالات مهمة" = تنويع حسب الأقسام لإبراز محتوى متنوّع
+function pickImportant(others, fallback) {
+    const seen = new Set();
+    const out = [];
+    for (const a of others) {
+        if (!seen.has(a.category)) {
+            seen.add(a.category);
+            out.push(a);
+        }
+    }
+    return out.length ? out : fallback;
+}
+
+function renderRelatedGrid(related) {
+    const grid = document.getElementById("relatedGrid");
+    if (!grid) return;
+    if (!related.length) {
+        grid.innerHTML = `<div class="empty-state">لا توجد مقالات أخرى.</div>`;
+        return;
+    }
+    grid.innerHTML = related
+        .map((a) => {
+            const img = a.image
+                ? `<div class="card-image" style="background-image:url('${a.image}')"></div>`
+                : `<div class="card-image placeholder"></div>`;
+            return `
+            <article class="article-card">
+                <a href="/article/${encodeURIComponent(a.slug)}">${img}</a>
+                <div class="card-body">
+                    <span class="card-category">${escapeHtml(a.category)}</span>
+                    <h3 class="card-title"><a href="/article/${encodeURIComponent(a.slug)}">${escapeHtml(a.title)}</a></h3>
+                </div>
+            </article>`;
+        })
+        .join("");
+}
+
+function renderSidebarList(id, items) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!items || !items.length) {
+        el.innerHTML = `<li class="sb-empty">لا توجد مقالات.</li>`;
+        return;
+    }
+    el.innerHTML = items
+        .map((a) => {
+            const slug = encodeURIComponent(a.slug);
+            const thumbCls = a.image ? "sb-thumb" : "sb-thumb placeholder";
+            const thumbStyle = a.image ? ` style="background-image:url('${a.image}')"` : "";
+            return `
+            <li class="sb-item">
+                <a href="/article/${slug}" class="${thumbCls}"${thumbStyle} aria-hidden="true" tabindex="-1"></a>
+                <div class="sb-text">
+                    <span class="sb-cat">${escapeHtml(a.category || "")}</span>
+                    <a href="/article/${slug}">${escapeHtml(a.title)}</a>
+                </div>
+            </li>`;
+        })
+        .join("");
 }
 
 function showError(msg) {

@@ -116,12 +116,21 @@
                             <div class="image-preview" id="imagePreview"><span>لا توجد صورة</span></div>
                             <div class="image-actions">
                                 <input type="file" id="fImageFile" accept="image/*" hidden>
-                                <button type="button" class="btn-ghost" id="uploadImageBtn">رفع صورة</button>
+                                <button type="button" class="btn-ghost" id="uploadImageBtn">رفع صورة من الجهاز</button>
                                 <button type="button" class="btn-ghost danger" id="removeImageBtn" hidden>إزالة</button>
                                 <input type="hidden" id="fImage">
                                 <small>أو الصق رابط صورة:</small>
                                 <input type="url" id="fImageUrl" placeholder="https://...">
                             </div>
+                        </div>
+                        <div class="ai-image-box">
+                            <small>أو ولّد صورة بالذكاء الاصطناعي:</small>
+                            <div class="ai-image-row">
+                                <input type="text" id="aiImagePrompt" placeholder="وصف الصورة (يُملأ تلقائياً من العنوان)">
+                                <select id="aiImageProvider" aria-label="أداة توليد الصورة"></select>
+                                <button type="button" class="btn-ghost" id="genImageBtn">🎨 توليد صورة</button>
+                            </div>
+                            <small class="ai-status" id="aiImageStatus"></small>
                         </div>
                     </div>
 

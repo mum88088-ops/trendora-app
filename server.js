@@ -358,6 +358,97 @@ app.post(
   })
 );
 
+/* ---------- AI image generation ---------- */
+async function imageWithOpenAI(prompt) {
+  const resp = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1792x1024",
+      response_format: "b64_json",
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    const e = new Error(`خطأ من OpenAI (صور): ${resp.status} ${errText.slice(0, 300)}`);
+    e.status = 502;
+    throw e;
+  }
+  const json = await resp.json();
+  const b64 = json.data?.[0]?.b64_json;
+  if (!b64) {
+    const e = new Error("لم يُرجع OpenAI صورة");
+    e.status = 502;
+    throw e;
+  }
+  return { buffer: Buffer.from(b64, "base64"), mimetype: "image/png" };
+}
+
+async function imageWithGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      instances: [{ prompt }],
+      parameters: { sampleCount: 1, aspectRatio: "16:9" },
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    const e = new Error(
+      `خطأ من Gemini (صور): ${resp.status} ${errText.slice(0, 300)} — قد تتطلب صور Imagen خطة مدفوعة.`
+    );
+    e.status = 502;
+    throw e;
+  }
+  const json = await resp.json();
+  const b64 = json.predictions?.[0]?.bytesBase64Encoded;
+  if (!b64) {
+    const e = new Error("لم يُرجع Gemini صورة (قد تكون خطة Imagen غير مفعّلة)");
+    e.status = 502;
+    throw e;
+  }
+  return { buffer: Buffer.from(b64, "base64"), mimetype: "image/png" };
+}
+
+app.post(
+  "/api/admin/ai/image",
+  requireAuth,
+  wrap(async (req, res) => {
+    const { prompt } = req.body || {};
+    let { provider } = req.body || {};
+    if (!prompt) return res.status(400).json({ error: "يرجى إدخال وصف الصورة" });
+
+    if (!provider) provider = OPENAI_API_KEY ? "openai" : "gemini";
+    if (provider === "openai" && !OPENAI_API_KEY) {
+      return res.status(400).json({ error: "مفتاح OpenAI غير مضبوط لتوليد الصور." });
+    }
+    if (provider === "gemini" && !GEMINI_API_KEY) {
+      return res.status(400).json({ error: "مفتاح Gemini غير مضبوط لتوليد الصور." });
+    }
+
+    const enriched = `${prompt}. صورة واقعية عالية الجودة مناسبة كصورة رئيسية لمقال إخباري، بدون أي نصوص أو حروف مكتوبة على الصورة.`;
+    const img =
+      provider === "gemini"
+        ? await imageWithGemini(enriched)
+        : await imageWithOpenAI(enriched);
+
+    const url = await store.saveImage({
+      buffer: img.buffer,
+      mimetype: img.mimetype,
+      originalname: "ai-image.png",
+    });
+    res.json({ url, provider });
+  })
+);
+
 /* ---------- serve DB-stored images (MongoDB / Firestore modes) ---------- */
 if (store.servesImages) {
   app.get(
