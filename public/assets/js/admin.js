@@ -363,6 +363,7 @@ async function editArticle(id) {
     $("fExcerpt").value = article.excerpt || "";
     $("fContent").value = article.content || "";
     $("fTags").value = (article.tags || []).join(", ");
+    $("fKeywords").value = (article.keywords || []).join(", ");
     $("fStatus").value = article.status;
     setImage(article.image || "");
     switchTo("editor");
@@ -378,6 +379,7 @@ async function saveArticle(e) {
         content: $("fContent").value.trim(),
         image: $("fImage").value.trim(),
         tags: $("fTags").value.split(",").map((t) => t.trim()).filter(Boolean),
+        keywords: $("fKeywords").value.split(",").map((t) => t.trim()).filter(Boolean),
         status: $("fStatus").value,
     };
     const msg = $("saveMsg");
@@ -576,6 +578,7 @@ function useAiResult() {
     $("fContent").value = lastAi.content || "";
     $("fCategory").value = lastAi.category || $("aiCategory").value.trim() || "عام";
     $("fTags").value = (lastAi.tags || []).join(", ");
+    $("fKeywords").value = (lastAi.keywords || lastAi.tags || []).join(", ");
     $("fStatus").value = "draft";
     switchTo("editor");
 }

@@ -78,6 +78,17 @@ function updateSeo(a) {
     const url = `${location.origin}/article/${encodeURIComponent(a.slug)}`;
     document.title = `${a.title} | Trendora`;
     setAttr("metaDescription", "content", a.excerpt || a.title);
+
+    const kw = (a.keywords && a.keywords.length ? a.keywords : a.tags) || [];
+    if (kw.length) {
+        let meta = document.querySelector('meta[name="keywords"]');
+        if (!meta) {
+            meta = document.createElement("meta");
+            meta.setAttribute("name", "keywords");
+            document.head.appendChild(meta);
+        }
+        meta.setAttribute("content", kw.join(", "));
+    }
     setAttr("metaCanonical", "href", url);
     setAttr("ogTitle", "content", a.title);
     setAttr("ogDesc", "content", a.excerpt || a.title);

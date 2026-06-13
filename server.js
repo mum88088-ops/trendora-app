@@ -394,6 +394,7 @@ ${category ? `التصنيف: ${category}.` : ""}
   "title": "عنوان جذاب ومحسّن لمحركات البحث",
   "excerpt": "وصف موجز من جملة إلى جملتين (ميتا ديسكربشن)",
   "tags": ["وسم1", "وسم2", "وسم3"],
+  "keywords": ["كلمة مفتاحية1", "كلمة مفتاحية2", "كلمة مفتاحية3", "كلمة مفتاحية4"],
   "content": "محتوى المقال بصيغة HTML باستخدام وسوم <h2> و<h3> و<p> و<ul><li> و<blockquote> فقط. قسّم المقال إلى 4-5 أقسام بعناوين فرعية، وابدأ بفقرة تمهيدية، واختم بخلاصة. لا تضع وسم <h1> ولا <html> أو <body>."
 }`;
 }
@@ -552,6 +553,7 @@ app.post(
       title: parsed.title || topic,
       excerpt: parsed.excerpt || "",
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
       content: parsed.content || "",
       category: category || "عام",
       provider,

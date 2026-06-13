@@ -181,13 +181,15 @@ function setYear() {
    كنافذة منبثقة لتجربة أسرع وأسهل دون مغادرة الصفحة. */
 const MODAL_PAGES = ["about.html", "contact.html", "privacy.html", "terms.html"];
 
+// النافذة تُنشأ فقط عند الضغط على رابط، وتُزال تماماً عند الإغلاق
+// (تضمن عدم ظهورها أبداً عند فتح الموقع)
+let activeModal = null;
+
 function initContentModals() {
-    const modal = buildModal();
     document.addEventListener("click", (e) => {
         const link = e.target.closest("a");
         if (!link) return;
         const href = link.getAttribute("href") || "";
-        // تجاهل الروابط الخارجية أو ذات الأهداف الخاصة
         if (link.target === "_blank" || link.hasAttribute("data-no-modal")) return;
         let url;
         try { url = new URL(href, location.href); } catch { return; }
@@ -195,38 +197,34 @@ function initContentModals() {
         const file = url.pathname.split("/").pop();
         if (!MODAL_PAGES.includes(file)) return;
         e.preventDefault();
-        openModal(modal, url.href, link.textContent.trim());
+        openModal(url.href, link.textContent.trim());
     });
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") closeModal(modal);
+        if (e.key === "Escape") closeModal();
     });
 }
 
-function buildModal() {
+async function openModal(href, title) {
+    closeModal(); // أغلق أي نافذة سابقة
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
-    overlay.setAttribute("hidden", "");
     overlay.innerHTML = `
         <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-            <button class="modal-close" aria-label="إغلاق">&times;</button>
+            <button class="modal-close" aria-label="إغلاق" type="button">&times;</button>
             <h2 class="modal-title" id="modalTitle"></h2>
             <div class="modal-body"><p class="empty-state">جارٍ التحميل...</p></div>
         </div>`;
-    document.body.appendChild(overlay);
     overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) closeModal(overlay);
+        if (e.target === overlay) closeModal();
     });
-    overlay.querySelector(".modal-close").addEventListener("click", () => closeModal(overlay));
-    return overlay;
-}
+    overlay.querySelector(".modal-close").addEventListener("click", closeModal);
+    document.body.appendChild(overlay);
+    document.body.classList.add("modal-open");
+    activeModal = overlay;
 
-async function openModal(overlay, href, title) {
     const body = overlay.querySelector(".modal-body");
     const titleEl = overlay.querySelector(".modal-title");
     titleEl.textContent = title || "";
-    body.innerHTML = `<p class="empty-state">جارٍ التحميل...</p>`;
-    overlay.removeAttribute("hidden");
-    document.body.classList.add("modal-open");
     try {
         const res = await fetch(href);
         const html = await res.text();
@@ -245,8 +243,11 @@ async function openModal(overlay, href, title) {
     }
 }
 
-function closeModal(overlay) {
-    overlay.setAttribute("hidden", "");
+function closeModal() {
+    if (activeModal) {
+        activeModal.remove();
+        activeModal = null;
+    }
     document.body.classList.remove("modal-open");
 }
 
