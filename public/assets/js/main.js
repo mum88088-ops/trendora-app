@@ -1,6 +1,28 @@
 /* ===== Trendora — Homepage logic ===== */
 
+/* قائمة الأقسام الموحّدة (تُستخدم في القائمة المنسدلة وأزرار الفلترة) */
+const CATEGORIES = [
+    { name: "آخر الأخبار", icon: "📰" },
+    { name: "التعليم", icon: "🎓" },
+    { name: "المعاشات", icon: "👴" },
+    { name: "المرتبات والأجور", icon: "💰" },
+    { name: "الوظائف والتوظيف", icon: "💼" },
+    { name: "الاقتصاد والأسواق", icon: "📈" },
+    { name: "أسعار الذهب والعملات", icon: "🪙" },
+    { name: "الخدمات الحكومية", icon: "🏛️" },
+    { name: "الصحة", icon: "🩺" },
+    { name: "التقنية", icon: "💻" },
+    { name: "الرياضة", icon: "⚽" },
+    { name: "الفن والمشاهير", icon: "🎬" },
+    { name: "السيارات", icon: "🚗" },
+    { name: "الطقس", icon: "☀️" },
+    { name: "أسلوب حياة", icon: "🌿" },
+    { name: "عام", icon: "📌" },
+];
+
 document.addEventListener("DOMContentLoaded", () => {
+    populateCategoryMenus();
+    populateFilters();
     initNav();
     initContentModals();
     setYear();
@@ -81,6 +103,33 @@ function renderArticles(articles) {
 }
 
 /* ===== shared helpers ===== */
+
+/* يملأ كل قوائم "الأقسام" المنسدلة في الصفحات تلقائياً */
+function populateCategoryMenus() {
+    const menus = document.querySelectorAll(".dropdown-menu");
+    if (!menus.length) return;
+    const itemsHtml = CATEGORIES.map(
+        (c) =>
+            `<li><a href="/?cat=${encodeURIComponent(c.name)}"><span class="cat-ico">${c.icon}</span> ${escapeHtml(c.name)}</a></li>`
+    ).join("");
+    menus.forEach((menu) => {
+        menu.innerHTML = itemsHtml;
+        menu.classList.add("mega-menu");
+    });
+}
+
+/* يبني أزرار الفلترة في الصفحة الرئيسية (الكل + الأقسام) */
+function populateFilters() {
+    const filters = document.getElementById("filters");
+    if (!filters) return;
+    filters.innerHTML =
+        `<button class="filter-btn active" data-cat="all">الكل</button>` +
+        CATEGORIES.map(
+            (c) =>
+                `<button class="filter-btn" data-cat="${escapeAttr(c.name)}"><span class="cat-ico">${c.icon}</span> ${escapeHtml(c.name)}</button>`
+        ).join("");
+}
+
 function initNav() {
     const navToggle = document.getElementById("navToggle");
     const mainNav = document.getElementById("mainNav");

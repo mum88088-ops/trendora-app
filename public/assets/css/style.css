@@ -479,8 +479,22 @@ img { max-width: 100%; display: block; }
 .has-dropdown:hover .dropdown-menu,
 .has-dropdown.open .dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
 .dropdown-menu li { width: 100%; }
-.dropdown-menu a { display: block; padding: 10px 14px; border-radius: 9px; font-weight: 600; white-space: nowrap; }
+.dropdown-menu a { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 9px; font-weight: 600; white-space: nowrap; }
 .dropdown-menu a:hover { background-color: var(--color-bg); color: var(--color-primary); }
+.cat-ico { font-size: 1.05rem; line-height: 1; }
+
+/* قائمة ميجا منيو متعددة الأعمدة للأقسام الكثيرة */
+.dropdown-menu.mega-menu {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(170px, 1fr));
+    gap: 2px 6px;
+    min-width: 380px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+.has-dropdown:hover .dropdown-menu.mega-menu,
+.has-dropdown.open .dropdown-menu.mega-menu { display: grid; }
+.dropdown-menu.mega-menu a { white-space: nowrap; }
 
 /* ===== Modal popup (content pages) ===== */
 body.modal-open { overflow: hidden; }
@@ -649,7 +663,8 @@ body.modal-open { overflow: hidden; }
     .main-nav ul { flex-direction: column; padding: 12px; gap: 4px; }
     /* القائمة المنسدلة تصبح ثابتة داخل القائمة الجوّالة */
     .dropdown-toggle { width: 100%; justify-content: space-between; }
-    .dropdown-menu {
+    .dropdown-menu,
+    .dropdown-menu.mega-menu {
         position: static;
         opacity: 1;
         visibility: visible;
@@ -658,10 +673,14 @@ body.modal-open { overflow: hidden; }
         border: none;
         padding: 4px 4px 4px 14px;
         min-width: 0;
+        max-height: none;
+        grid-template-columns: 1fr;
         display: none;
     }
-    .has-dropdown:hover .dropdown-menu { display: none; }
-    .has-dropdown.open .dropdown-menu { display: flex; }
+    .has-dropdown:hover .dropdown-menu,
+    .has-dropdown:hover .dropdown-menu.mega-menu { display: none; }
+    .has-dropdown.open .dropdown-menu,
+    .has-dropdown.open .dropdown-menu.mega-menu { display: grid; }
     .article-grid,
     .related-articles .article-grid { grid-template-columns: 1fr; }
     .hero h1 { font-size: 2rem; }
