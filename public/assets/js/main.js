@@ -8,13 +8,16 @@ let CATEGORIES = [
     { name: "المرتبات والأجور", icon: "💰" },
 ];
 let HOMEPAGE_COUNT = 4;
+let SITE_ADS = { clientId: "", inArticleCode: "" };
 
 document.addEventListener("DOMContentLoaded", async () => {
     await loadSiteSettings();
     populateCategoryMenus();
     populateFilters();
+    renderTopAd();
     initNav();
     initContentModals();
+    initContactForm();
     setYear();
 
     const grid = document.getElementById("articleGrid");
@@ -105,9 +108,27 @@ async function loadSiteSettings() {
             CATEGORIES = data.categories;
         }
         if (data.homepageCount) HOMEPAGE_COUNT = data.homepageCount;
+        if (data.adsense) SITE_ADS = data.adsense;
     } catch {
         /* يبقى الافتراضي */
     }
+}
+
+/* إعلان علوي في الصفحة الرئيسية */
+function renderTopAd() {
+    const slot = document.getElementById("topAdSlot");
+    if (!slot) return;
+    if (SITE_ADS.inArticleCode) {
+        slot.innerHTML = `<div class="ad-container ad-leaderboard">${SITE_ADS.inArticleCode}</div>`;
+    } else if (SITE_ADS.clientId) {
+        slot.innerHTML = `<div class="ad-container ad-leaderboard">
+            <ins class="adsbygoogle" style="display:block;width:100%"
+                data-ad-client="${SITE_ADS.clientId}"
+                data-ad-format="auto" data-full-width-responsive="true"></ins>
+        </div>`;
+        try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch { /* ignore */ }
+    }
+    // بدون إعلان مضبوط: لا نعرض مساحة فارغة في الصفحة الرئيسية
 }
 
 /* يملأ كل قوائم "الأقسام" المنسدلة في الصفحات تلقائياً (كل الأقسام) */
@@ -174,6 +195,27 @@ function initNav() {
 function setYear() {
     const el = document.getElementById("year");
     if (el) el.textContent = new Date().getFullYear();
+}
+
+/* نموذج اتصل بنا: يفتح بريد المستخدم بالرسالة جاهزة (بدون خادم بريد) */
+function initContactForm() {
+    const form = document.getElementById("contactForm");
+    if (!form) return;
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = document.getElementById("cName")?.value.trim() || "";
+        const email = document.getElementById("cEmail")?.value.trim() || "";
+        const message = document.getElementById("cMessage")?.value.trim() || "";
+        const msgEl = document.getElementById("contactMsg");
+        const subject = encodeURIComponent(`رسالة من ${name} عبر Trendora`);
+        const body = encodeURIComponent(`الاسم: ${name}\nالبريد: ${email}\n\n${message}`);
+        window.location.href = `mailto:info@trendora1.com?subject=${subject}&body=${body}`;
+        if (msgEl) {
+            msgEl.textContent = "تم فتح برنامج البريد لإرسال رسالتك. شكراً لتواصلك!";
+            msgEl.className = "save-msg ok";
+        }
+        form.reset();
+    });
 }
 
 /* ===== Modal popups for content pages (about/contact/privacy/terms) =====

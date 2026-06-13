@@ -49,8 +49,11 @@
             <button class="tab-btn" data-view="ai">أداة الذكاء الاصطناعي</button>
             <button class="tab-btn" data-view="categories">الأقسام</button>
             <button class="tab-btn" data-view="ads">الإعلانات</button>
+            <button class="tab-btn" data-view="trash">🗑️ سلة المهملات</button>
             <button class="tab-btn" data-view="security">كلمة المرور</button>
         </nav>
+
+        <div class="storage-warning" id="storageWarning" hidden></div>
 
         <main class="admin-main">
 
@@ -171,13 +174,31 @@
                         <small class="field-hint">تُستخدم في وسم meta keywords لتحسين ظهور المقال في البحث.</small>
                     </div>
 
-                    <div class="field">
-                        <label>الحالة</label>
-                        <select id="fStatus">
-                            <option value="published">منشور (ظاهر للجميع)</option>
-                            <option value="draft">مسودة (غير ظاهر)</option>
-                            <option value="hidden">مخفي</option>
-                        </select>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>الحالة</label>
+                            <select id="fStatus">
+                                <option value="published">منشور (ظاهر للجميع)</option>
+                                <option value="draft">مسودة (غير ظاهر)</option>
+                                <option value="hidden">مخفي</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>مدة بقاء المقال على الموقع</label>
+                            <select id="fExpiry">
+                                <option value="">دائم / إبقاء الحالي</option>
+                                <option value="clear">إلغاء الانتهاء (دائم)</option>
+                                <option value="60">دقيقة واحدة</option>
+                                <option value="120">دقيقتان</option>
+                                <option value="600">10 دقائق</option>
+                                <option value="3600">ساعة</option>
+                                <option value="86400">يوم</option>
+                                <option value="604800">أسبوع</option>
+                                <option value="2592000">شهر</option>
+                                <option value="31536000">سنة</option>
+                            </select>
+                            <small class="field-hint" id="expiryHint">بعد انتهاء المدة يختفي المقال تلقائياً حتى تعيد إظهاره.</small>
+                        </div>
                     </div>
 
                     <div class="editor-actions">
@@ -303,6 +324,31 @@
                     <div class="editor-actions">
                         <button type="button" class="btn" id="saveAdsBtn">حفظ الإعدادات</button>
                         <span class="save-msg" id="adsSaveMsg"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TRASH VIEW -->
+            <section class="view" id="view-trash" hidden>
+                <div class="view-head">
+                    <h2>سلة المهملات</h2>
+                </div>
+                <div class="settings-panel">
+                    <p class="panel-note">المقالات المحذوفة تبقى هنا. يمكنك استعادتها أو حذفها نهائياً.</p>
+                    <div class="table-wrap">
+                        <table class="articles-table">
+                            <thead>
+                                <tr>
+                                    <th>العنوان</th>
+                                    <th>التصنيف</th>
+                                    <th>تاريخ الحذف</th>
+                                    <th>إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trashTbody">
+                                <tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

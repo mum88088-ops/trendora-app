@@ -247,6 +247,35 @@ app.delete(
   })
 );
 
+/* ---------- trash (recycle bin) ---------- */
+app.get(
+  "/api/admin/trash",
+  requireAuth,
+  wrap(async (req, res) => {
+    res.json({ articles: await store.listTrash() });
+  })
+);
+
+app.post(
+  "/api/admin/articles/:id/restore",
+  requireAuth,
+  wrap(async (req, res) => {
+    const article = await store.restore(req.params.id);
+    if (!article) return res.status(404).json({ error: "المقال غير موجود" });
+    res.json({ article });
+  })
+);
+
+app.delete(
+  "/api/admin/trash/:id",
+  requireAuth,
+  wrap(async (req, res) => {
+    const removed = await store.purge(req.params.id);
+    if (!removed) return res.status(404).json({ error: "المقال غير موجود" });
+    res.json({ ok: true });
+  })
+);
+
 /* ---------- settings management (protected) ---------- */
 app.get(
   "/api/admin/settings",
@@ -259,6 +288,7 @@ app.get(
       adsense: s.adsense,
       analyticsId: s.analyticsId || "",
       hasCustomPassword: Boolean(s.passwordHash),
+      storage: { backend: store.backend, persistent: Boolean(store.persistent) },
     });
   })
 );

@@ -102,8 +102,24 @@ async function loadSettings() {
         if (res.status === 401) return handleUnauthorized();
         siteSettings = await res.json();
         fillCategoryDatalist();
+        showStorageWarning(siteSettings.storage);
     } catch {
         /* ignore */
+    }
+}
+
+/** يحذّر إذا كان التخزين غير دائم (يُمسح عند إعادة النشر) */
+function showStorageWarning(storage) {
+    const el = $("storageWarning");
+    if (!el) return;
+    if (storage && storage.persistent === false) {
+        el.innerHTML =
+            "⚠️ تنبيه مهم: التخزين الحالي مؤقت (" +
+            escapeHtml(storage.backend || "ملف محلي") +
+            ") وسيُحذف عند إعادة نشر الموقع. لحفظ المقالات بشكل دائم، فعّل قاعدة بيانات Firebase (FIREBASE_SERVICE_ACCOUNT_B64) في إعدادات الخادم.";
+        el.hidden = false;
+    } else {
+        el.hidden = true;
     }
 }
 
@@ -258,12 +274,13 @@ function handleUnauthorized() {
 function switchView(view, btn) {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     if (btn) btn.classList.add("active");
-    ["list", "editor", "ai", "categories", "ads", "security"].forEach(
+    ["list", "editor", "ai", "categories", "ads", "trash", "security"].forEach(
         (v) => ($(`view-${v}`).hidden = v !== view)
     );
     if (view === "list") loadArticles();
     if (view === "categories") loadCategoriesView();
     if (view === "ads") loadAdsView();
+    if (view === "trash") loadTrash();
 }
 function switchTo(view) {
     const btn = document.querySelector(`.tab-btn[data-view="${view}"]`);
@@ -301,11 +318,12 @@ function renderStats(articles) {
 }
 function rowHtml(a) {
     const statusLabel = { published: "منشور", draft: "مسودة", hidden: "مخفي" }[a.status] || a.status;
+    const expiredBadge = a.expired ? ` <span class="badge expired">منتهٍ</span>` : "";
     return `
     <tr data-id="${a.id}">
         <td class="article-title-cell">${escapeHtml(a.title)}</td>
         <td>${escapeHtml(a.category)}</td>
-        <td><span class="badge ${a.status}">${statusLabel}</span></td>
+        <td><span class="badge ${a.status}">${statusLabel}</span>${expiredBadge}</td>
         <td>${formatDate(a.createdAt)}</td>
         <td>
             <div class="row-actions">
@@ -335,9 +353,61 @@ async function rowAction(act, id, tr) {
     if (act === "publish") return changeStatus(id, "published");
     if (act === "hide") return changeStatus(id, "hidden");
     if (act === "delete") {
-        if (!confirm("هل أنت متأكد من حذف هذا المقال نهائياً؟")) return;
+        if (!confirm("نقل هذا المقال إلى سلة المهملات؟ يمكنك استعادته لاحقاً.")) return;
         await api(`/api/admin/articles/${id}`, { method: "DELETE" });
         loadArticles();
+    }
+}
+
+/* ---------- trash ---------- */
+async function loadTrash() {
+    const tbody = $("trashTbody");
+    tbody.innerHTML = `<tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>`;
+    try {
+        const res = await api("/api/admin/trash");
+        if (res.status === 401) return handleUnauthorized();
+        const { articles } = await res.json();
+        if (!articles.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="loading">سلة المهملات فارغة.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = articles
+            .map(
+                (a) => `
+            <tr data-id="${a.id}">
+                <td class="article-title-cell">${escapeHtml(a.title)}</td>
+                <td>${escapeHtml(a.category)}</td>
+                <td>${formatDate(a.deletedAt)}</td>
+                <td>
+                    <div class="row-actions">
+                        <button data-act="restore">استعادة</button>
+                        <button data-act="purge" class="danger">حذف نهائي</button>
+                    </div>
+                </td>
+            </tr>`
+            )
+            .join("");
+        tbody.querySelectorAll("tr").forEach((tr) => {
+            const id = tr.dataset.id;
+            tr.querySelectorAll("button").forEach((btn) =>
+                btn.addEventListener("click", () => trashAction(btn.dataset.act, id))
+            );
+        });
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="4" class="loading">تعذّر التحميل.</td></tr>`;
+    }
+}
+
+async function trashAction(act, id) {
+    if (act === "restore") {
+        await api(`/api/admin/articles/${id}/restore`, { method: "POST" });
+        loadTrash();
+        return;
+    }
+    if (act === "purge") {
+        if (!confirm("حذف هذا المقال نهائياً؟ لا يمكن التراجع.")) return;
+        await api(`/api/admin/trash/${id}`, { method: "DELETE" });
+        loadTrash();
     }
 }
 async function changeStatus(id, status) {
@@ -363,7 +433,25 @@ function fillEditorFields(article) {
     $("fTags").value = (article.tags || []).join(", ");
     $("fKeywords").value = (article.keywords || []).join(", ");
     $("fStatus").value = article.status || "published";
+    // المدة تُترك "دائم" افتراضياً؛ الانتهاء الحالي يُعرض كتلميح
+    $("fExpiry").value = "";
+    updateExpiryHint(article.expiresAt);
     setImage(article.image || "");
+}
+
+/** يعرض تاريخ الانتهاء الحالي للمقال كتلميح */
+function updateExpiryHint(expiresAt) {
+    const hint = $("expiryHint");
+    if (!hint) return;
+    if (expiresAt) {
+        const d = new Date(expiresAt);
+        const past = d.getTime() <= Date.now();
+        hint.textContent = past
+            ? `انتهى ظهور هذا المقال في ${d.toLocaleString("ar-EG")}. اختر «دائم» أو مدة جديدة لإظهاره.`
+            : `ينتهي ظهور المقال في ${d.toLocaleString("ar-EG")}. اختر مدة جديدة لتغييرها أو «دائم» لإلغاء الانتهاء.`;
+    } else {
+        hint.textContent = "بعد انتهاء المدة يختفي المقال تلقائياً حتى تعيد إظهاره.";
+    }
 }
 
 /** يضبط أزرار المحرر حسب الوضع: تحرير أو مقال جديد */
@@ -378,6 +466,7 @@ function resetEditor() {
     $("articleForm").reset();
     $("articleId").value = "";
     setImage("");
+    updateExpiryHint(null);
     $("saveMsg").textContent = "";
     setEditorMode(false);
 }
@@ -420,6 +509,13 @@ async function saveArticle(e) {
         keywords: $("fKeywords").value.split(",").map((t) => t.trim()).filter(Boolean),
         status: $("fStatus").value,
     };
+    const expVal = $("fExpiry").value;
+    if (expVal === "clear") {
+        payload.expiresAt = null; // إلغاء الانتهاء صراحة
+    } else if (expVal) {
+        payload.expiresAt = new Date(Date.now() + Number(expVal) * 1000).toISOString();
+    }
+    // عند "" لا نرسل expiresAt فيبقى كما هو (أو null للمقال الجديد)
     if (!payload.title || !payload.content) {
         const msg = $("saveMsg");
         msg.textContent = "العنوان والمحتوى مطلوبان.";
@@ -486,7 +582,8 @@ async function uploadImage(e) {
     } catch {
         alert("فشل رفع الصورة");
     } finally {
-        $("uploadImageBtn").textContent = "رفع صورة";
+        $("uploadImageBtn").textContent = "رفع صورة من الجهاز";
+        e.target.value = "";
     }
 }
 

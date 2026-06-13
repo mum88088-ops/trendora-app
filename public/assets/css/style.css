@@ -619,6 +619,9 @@ body.modal-open { overflow: hidden; }
     outline: none;
 }
 .contact-form input:focus, .contact-form textarea:focus { border-color: var(--color-primary); }
+.save-msg { font-size: 0.92rem; font-weight: 600; min-height: 18px; }
+.save-msg.ok { color: #15803d; }
+.save-msg.err { color: #dc2626; }
 
 .btn {
     display: inline-flex;

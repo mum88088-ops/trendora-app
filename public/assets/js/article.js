@@ -1,13 +1,53 @@
 /* ===== Trendora — Single article logic ===== */
 
-document.addEventListener("DOMContentLoaded", () => {
+let siteAds = { clientId: "", inArticleCode: "" };
+
+document.addEventListener("DOMContentLoaded", async () => {
     const slug = getSlug();
     if (!slug) {
         showError("لم يتم تحديد المقال.");
         return;
     }
+    await loadAdsConfig();
     loadArticle(slug);
 });
+
+async function loadAdsConfig() {
+    try {
+        const res = await fetch("/api/settings");
+        const data = await res.json();
+        siteAds = data.adsense || siteAds;
+    } catch {
+        /* ignore */
+    }
+}
+
+/** يبني وحدة إعلانية: كود الأدمن المخصّص أو وحدة AdSense تلقائية، أو عنصر نائب */
+function adUnit(extraClass) {
+    if (siteAds.inArticleCode) {
+        return `<div class="ad-container ${extraClass}">${siteAds.inArticleCode}</div>`;
+    }
+    if (siteAds.clientId) {
+        return `<div class="ad-container ${extraClass}">
+            <ins class="adsbygoogle" style="display:block;width:100%"
+                data-ad-client="${siteAds.clientId}"
+                data-ad-format="auto" data-full-width-responsive="true"></ins>
+        </div>`;
+    }
+    return `<div class="ad-container ${extraClass}"><span class="ad-label">مساحة إعلانية</span></div>`;
+}
+
+/** يفعّل وحدات AdSense بعد إدراجها في الصفحة */
+function activateAds() {
+    if (!siteAds.clientId && !siteAds.inArticleCode) return;
+    document.querySelectorAll(".adsbygoogle").forEach(() => {
+        try {
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch {
+            /* ignore */
+        }
+    });
+}
 
 function getSlug() {
     // supports /article/:slug  and  /article.html?slug=...  and  ?id=...
@@ -58,20 +98,20 @@ function renderArticle(a) {
         <footer class="article-footer">
             <div class="tags">${tags}</div>
         </footer>
-        <div class="ad-container ad-end"><span class="ad-label">إعلان</span></div>
+        ${adUnit("ad-end")}
     `;
+    activateAds();
 }
 
-// Insert in-article ad slots between paragraphs (after 2nd and before last third)
+// Insert in-article ad slots between paragraphs (after 2nd and around middle)
 function injectAds(html) {
-    const adSlot =
-        '<div class="ad-container ad-in-article"><span class="ad-label">إعلان</span></div>';
+    const adSlot = adUnit("ad-in-article");
     const parts = html.split("</p>");
     if (parts.length < 4) return html;
     const mid = Math.floor(parts.length / 2);
     parts[1] += "</p>" + adSlot;
     parts[mid] += "</p>" + adSlot;
-    return parts.join("</p>").replace(adSlot + "</p>", adSlot); // tidy
+    return parts.join("</p>");
 }
 
 function updateSeo(a) {
