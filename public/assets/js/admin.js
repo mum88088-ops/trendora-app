@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (e.key === "Enter") { e.preventDefault(); previewUrlImage(); }
     });
     $("insertImageBtn")?.addEventListener("click", insertImageIntoContent);
+    $("insertVideoBtn")?.addEventListener("click", insertVideoIntoContent);
     document.querySelectorAll(".img-tab").forEach((btn) =>
         btn.addEventListener("click", () => switchImageTab(btn.dataset.imgtab))
     );
@@ -602,11 +603,50 @@ function insertImageIntoContent() {
     const figure = caption
         ? `\n<figure>\n  <img src="${clean}" alt="${caption.replace(/"/g, "&quot;")}" loading="lazy">\n  <figcaption>${caption}</figcaption>\n</figure>\n`
         : `\n<img src="${clean}" alt="صورة توضيحية" loading="lazy">\n`;
+    insertAtCursor(figure);
+}
+
+/** يحوّل رابط يوتيوب إلى معرّف الفيديو */
+function youtubeId(url) {
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/shorts\/)([\w-]{11})/,
+    ];
+    for (const re of patterns) {
+        const m = url.match(re);
+        if (m) return m[1];
+    }
+    return null;
+}
+
+/** يدرج فيديو (YouTube أو رابط mp4 مباشر) داخل محتوى المقال عند موضع المؤشر */
+function insertVideoIntoContent() {
+    const url = prompt("الصق رابط الفيديو (YouTube أو رابط mp4 مباشر):");
+    if (!url) return;
+    const clean = url.trim();
+    if (!/^https?:\/\//i.test(clean)) {
+        alert("الرابط يجب أن يبدأ بـ http أو https");
+        return;
+    }
+    let html;
+    const ytId = youtubeId(clean);
+    if (ytId) {
+        html = `\n<div class="video-embed"><iframe src="https://www.youtube.com/embed/${ytId}" title="فيديو" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>\n`;
+    } else if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(clean)) {
+        html = `\n<div class="video-embed"><video src="${clean}" controls preload="metadata"></video></div>\n`;
+    } else {
+        alert("رابط غير مدعوم. استخدم رابط فيديو من YouTube أو رابط ملف فيديو مباشر (mp4 / webm).");
+        return;
+    }
+    insertAtCursor(html);
+}
+
+/** يدرج نصاً عند موضع المؤشر في محرر المحتوى */
+function insertAtCursor(text) {
     const ta = $("fContent");
     const start = ta.selectionStart;
-    ta.value = ta.value.slice(0, start) + figure + ta.value.slice(ta.selectionEnd);
+    ta.value = ta.value.slice(0, start) + text + ta.value.slice(ta.selectionEnd);
     ta.focus();
-    ta.selectionStart = ta.selectionEnd = start + figure.length;
+    ta.selectionStart = ta.selectionEnd = start + text.length;
 }
 
 function switchImageTab(tab) {
