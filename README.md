@@ -20,7 +20,8 @@ npm start
 | `PORT` | منفذ الخادم (افتراضي 3000) |
 | `ADMIN_PASSWORD` | كلمة مرور لوحة التحكم |
 | `SESSION_SECRET` | سر الجلسات (نص عشوائي طويل) |
-| `OPENAI_API_KEY` | مفتاح OpenAI لتوليد المقالات بالذكاء الاصطناعي |
+| `GEMINI_API_KEY` | مفتاح Google Gemini المجاني لتوليد المقالات (من [AI Studio](https://aistudio.google.com/app/apikey)) |
+| `OPENAI_API_KEY` | مفتاح OpenAI لتوليد المقالات (بديل مدفوع) |
 | `SITE_URL` | رابط موقعك النهائي (مثل `https://trendora1.com`) |
 | `FIREBASE_SERVICE_ACCOUNT_B64` | مفتاح Firebase Service Account مُرمّزاً Base64 (للنشر) |
 | `FIREBASE_STORAGE_BUCKET` | حاوية تخزين صور Firebase |
@@ -130,4 +131,4 @@ trendora/
 
 - إنشاء / تحرير / حذف / إخفاء / نشر المقالات
 - رفع صور للمقالات
-- توليد مقالات بالذكاء الاصطناعي (يتطلب `OPENAI_API_KEY`)
+- توليد مقالات بالذكاء الاصطناعي — يدعم **Google Gemini (مجاني)** و **OpenAI**، مع إمكانية اختيار الأداة عند التوليد (يتطلب `GEMINI_API_KEY` أو `OPENAI_API_KEY`)

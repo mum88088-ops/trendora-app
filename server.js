@@ -17,6 +17,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trendora2026";
 const SESSION_SECRET = process.env.SESSION_SECRET || "trendora-secret-change-me";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 const MONGODB_URI = process.env.MONGODB_URI || "";
 const SITE_URL = (process.env.SITE_URL || "https://trendora1.com").replace(/\/$/, "");
 
@@ -84,6 +86,9 @@ function requireAuth(req, res, next) {
 const wrap = (fn) => (req, res) =>
   Promise.resolve(fn(req, res)).catch((err) => {
     console.error(err);
+    if (err && err.status) {
+      return res.status(err.status).json({ error: err.message || "خطأ" });
+    }
     res.status(500).json({ error: "حدث خطأ في الخادم" });
   });
 
@@ -212,29 +217,17 @@ app.post(
 );
 
 /* ============================================================
-   AI GENERATION (protected)
+   AI GENERATION (protected) — يدعم OpenAI + Google Gemini
    ============================================================ */
-app.post(
-  "/api/admin/ai/generate",
-  requireAuth,
-  wrap(async (req, res) => {
-    if (!OPENAI_API_KEY) {
-      return res.status(400).json({
-        error:
-          "لم يتم ضبط مفتاح OpenAI. أضف OPENAI_API_KEY في الإعدادات ثم أعد تشغيل الخادم.",
-      });
-    }
-    const { topic, category, length } = req.body || {};
-    if (!topic) return res.status(400).json({ error: "يرجى إدخال موضوع المقال" });
 
-    const wordTarget =
-      length === "short" ? "400-600" : length === "long" ? "1100-1500" : "700-900";
+const AI_SYSTEM_PROMPT =
+  "أنت كاتب محتوى عربي محترف لموقع إخباري اسمه Trendora. " +
+  "تكتب مقالات أصلية عالية الجودة ومنسّقة بـ HTML نظيف وجاهزة للنشر ومتوافقة مع سياسات Google AdSense (محتوى أصلي ومفيد، بدون حشو كلمات مفتاحية، بدون محتوى منسوخ).";
 
-    const systemPrompt =
-      "أنت كاتب محتوى عربي محترف لموقع إخباري اسمه Trendora. " +
-      "تكتب مقالات أصلية عالية الجودة ومنسّقة بـ HTML نظيف وجاهزة للنشر ومتوافقة مع سياسات Google AdSense (محتوى أصلي ومفيد، بدون حشو كلمات مفتاحية، بدون محتوى منسوخ).";
-
-    const userPrompt = `اكتب مقالاً عربياً كاملاً عن الموضوع التالي: "${topic}".
+function buildUserPrompt({ topic, category, length }) {
+  const wordTarget =
+    length === "short" ? "400-600" : length === "long" ? "1100-1500" : "700-900";
+  return `اكتب مقالاً عربياً كاملاً عن الموضوع التالي: "${topic}".
 ${category ? `التصنيف: ${category}.` : ""}
 الطول المستهدف: ${wordTarget} كلمة تقريباً.
 
@@ -245,37 +238,113 @@ ${category ? `التصنيف: ${category}.` : ""}
   "tags": ["وسم1", "وسم2", "وسم3"],
   "content": "محتوى المقال بصيغة HTML باستخدام وسوم <h2> و<h3> و<p> و<ul><li> و<blockquote> فقط. قسّم المقال إلى أقسام واضحة بعناوين فرعية، وابدأ بفقرة تمهيدية، واختم بخلاصة. لا تضع وسم <h1> ولا <html> أو <body>."
 }`;
+}
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.8,
-        response_format: { type: "json_object" },
-      }),
-    });
+function extractJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = String(text).match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return res
-        .status(502)
-        .json({ error: `خطأ من OpenAI: ${resp.status} ${errText.slice(0, 300)}` });
+async function generateWithOpenAI({ userPrompt, model }) {
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: model || OPENAI_MODEL,
+      messages: [
+        { role: "system", content: AI_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.8,
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    const e = new Error(`خطأ من OpenAI: ${resp.status} ${errText.slice(0, 300)}`);
+    e.status = 502;
+    throw e;
+  }
+  const json = await resp.json();
+  return json.choices?.[0]?.message?.content || "{}";
+}
+
+async function generateWithGemini({ userPrompt, model }) {
+  const useModel = model || GEMINI_MODEL;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    useModel
+  )}:generateContent?key=${GEMINI_API_KEY}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: AI_SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.8, responseMimeType: "application/json" },
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    const e = new Error(`خطأ من Gemini: ${resp.status} ${errText.slice(0, 300)}`);
+    e.status = 502;
+    throw e;
+  }
+  const json = await resp.json();
+  return json.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+}
+
+// المزوّدات المتاحة (لإظهارها في لوحة التحكم)
+app.get("/api/admin/ai/providers", requireAuth, (req, res) => {
+  res.json({
+    providers: [
+      { id: "gemini", name: "Google Gemini (مجاني)", available: Boolean(GEMINI_API_KEY), defaultModel: GEMINI_MODEL },
+      { id: "openai", name: "OpenAI", available: Boolean(OPENAI_API_KEY), defaultModel: OPENAI_MODEL },
+    ],
+  });
+});
+
+app.post(
+  "/api/admin/ai/generate",
+  requireAuth,
+  wrap(async (req, res) => {
+    const { topic, category, length, model } = req.body || {};
+    let { provider } = req.body || {};
+    if (!topic) return res.status(400).json({ error: "يرجى إدخال موضوع المقال" });
+
+    if (!provider) provider = GEMINI_API_KEY ? "gemini" : "openai";
+    if (provider === "openai" && !OPENAI_API_KEY) {
+      return res.status(400).json({
+        error: "مفتاح OpenAI غير مضبوط. أضف OPENAI_API_KEY في الإعدادات أو اختر Gemini.",
+      });
+    }
+    if (provider === "gemini" && !GEMINI_API_KEY) {
+      return res.status(400).json({
+        error: "مفتاح Gemini غير مضبوط. أضف GEMINI_API_KEY في الإعدادات أو اختر OpenAI.",
+      });
     }
 
-    const json = await resp.json();
-    const raw = json.choices?.[0]?.message?.content || "{}";
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
+    const userPrompt = buildUserPrompt({ topic, category, length });
+    const raw =
+      provider === "gemini"
+        ? await generateWithGemini({ userPrompt, model })
+        : await generateWithOpenAI({ userPrompt, model });
+
+    const parsed = extractJson(raw);
+    if (!parsed) {
       return res.status(502).json({ error: "تعذّر تحليل ناتج الذكاء الاصطناعي" });
     }
     res.json({
@@ -284,6 +353,7 @@ ${category ? `التصنيف: ${category}.` : ""}
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
       content: parsed.content || "",
       category: category || "عام",
+      provider,
     });
   })
 );

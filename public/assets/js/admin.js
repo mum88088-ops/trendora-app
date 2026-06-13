@@ -82,6 +82,14 @@ function showApp() {
     $("loginScreen").hidden = true;
     $("adminApp").hidden = false;
     loadArticles();
+    loadAiProviders();
+}
+
+/** يعيد المستخدم لشاشة الدخول إذا انتهت الجلسة (مثلاً بعد إعادة نشر Render) */
+function handleUnauthorized() {
+    showLogin();
+    const errEl = $("loginError");
+    if (errEl) errEl.textContent = "انتهت الجلسة. يرجى تسجيل الدخول من جديد.";
 }
 
 /* ---------- views ---------- */
@@ -101,7 +109,9 @@ async function loadArticles() {
     const tbody = $("articlesTbody");
     tbody.innerHTML = `<tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>`;
     try {
-        const { articles } = await api("/api/admin/articles").then((r) => r.json());
+        const res = await api("/api/admin/articles");
+        if (res.status === 401) return handleUnauthorized();
+        const { articles } = await res.json();
         renderStats(articles);
         if (!articles.length) {
             tbody.innerHTML = `<tr><td colspan="5" class="loading">لا توجد مقالات بعد. ابدأ بإنشاء مقال جديد.</td></tr>`;
@@ -280,9 +290,42 @@ function insertSnippet(tag) {
 
 /* ---------- AI ---------- */
 let lastAi = null;
+
+/** يحمّل أدوات الذكاء المتاحة (OpenAI / Gemini) ويملأ القائمة */
+async function loadAiProviders() {
+    const select = $("aiProvider");
+    const hint = $("aiProviderHint");
+    if (!select) return;
+    try {
+        const res = await api("/api/admin/ai/providers");
+        if (res.status === 401) return handleUnauthorized();
+        const { providers } = await res.json();
+        select.innerHTML = "";
+        providers.forEach((p) => {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.available ? p.name : `${p.name} (غير مفعّل)`;
+            opt.disabled = !p.available;
+            select.appendChild(opt);
+        });
+        // اختر أول مزوّد متاح
+        const firstAvailable = providers.find((p) => p.available);
+        if (firstAvailable) {
+            select.value = firstAvailable.id;
+            if (hint) hint.textContent = "";
+        } else if (hint) {
+            hint.textContent = "لا توجد أداة مفعّلة. أضف GEMINI_API_KEY (مجاني) أو OPENAI_API_KEY في إعدادات الخادم.";
+            hint.className = "field-hint warn";
+        }
+    } catch {
+        select.innerHTML = `<option value="">تعذّر تحميل الأدوات</option>`;
+    }
+}
+
 async function generateAI() {
     const topic = $("aiTopic").value.trim();
     if (!topic) { setAiStatus("يرجى إدخال موضوع المقال.", true); return; }
+    const provider = $("aiProvider")?.value || "";
     const btn = $("generateBtn");
     btn.disabled = true;
     setAiStatus('جارٍ توليد المقال بالذكاء الاصطناعي... قد يستغرق بضع ثوانٍ <span class="spinner"></span>');
@@ -295,8 +338,10 @@ async function generateAI() {
                 topic,
                 category: $("aiCategory").value.trim(),
                 length: $("aiLength").value,
+                provider,
             }),
         });
+        if (res.status === 401) return handleUnauthorized();
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "فشل التوليد");
         lastAi = data;

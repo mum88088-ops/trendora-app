@@ -139,6 +139,8 @@
 .field { display: flex; flex-direction: column; gap: 7px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field label { font-weight: 700; font-size: 0.92rem; color: var(--color-text); }
+.field-hint { color: var(--color-muted); font-size: 0.82rem; }
+.field-hint.warn { color: #b45309; }
 .field input, .field textarea, .field select {
     font-family: var(--font-body);
     font-size: 1rem;
