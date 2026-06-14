@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     $("insertImageBtn")?.addEventListener("click", insertImageIntoContent);
     $("insertVideoBtn")?.addEventListener("click", insertVideoIntoContent);
+    $("insertLinkBtn")?.addEventListener("click", insertLinkIntoContent);
     document.querySelectorAll(".img-tab").forEach((btn) =>
         btn.addEventListener("click", () => switchImageTab(btn.dataset.imgtab))
     );
@@ -853,6 +854,70 @@ function insertVideoIntoContent() {
         return;
     }
     insertAtCursor(html);
+}
+
+/** يدرج رابطاً داخل المقال عبر نافذة بحقلين: عنوان الرابط + الرابط نفسه.
+   يظهر الرابط في المقال بالعنوان الذي يكتبه المستخدم. */
+function insertLinkIntoContent() {
+    const ta = $("fContent");
+    // إن كان المستخدم قد ظلّل نصاً، نستخدمه كعنوان افتراضي للرابط
+    const selected = ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd).trim() : "";
+
+    openLinkDialog(selected, ({ title, url }) => {
+        const safeUrl = url.replace(/"/g, "&quot;");
+        const safeTitle = String(title)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const html = `<a href="${safeUrl}" target="_blank" rel="noopener">${safeTitle}</a>`;
+        insertAtCursor(html);
+    });
+}
+
+/** نافذة منبثقة بسيطة لإدراج رابط (حقل العنوان + حقل الرابط) */
+function openLinkDialog(defaultTitle, onConfirm) {
+    // إزالة أي نافذة سابقة
+    document.getElementById("linkDialogOverlay")?.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "linkDialogOverlay";
+    overlay.className = "link-dialog-overlay";
+    overlay.innerHTML = `
+        <div class="link-dialog" role="dialog" aria-modal="true" aria-label="إدراج رابط">
+            <h3>إدراج رابط داخل المقال</h3>
+            <label for="linkTitleInput">عنوان الرابط (النص الظاهر)</label>
+            <input type="text" id="linkTitleInput" placeholder="مثال: رابط التقديم الرسمي">
+            <label for="linkUrlInput">الرابط (URL)</label>
+            <input type="url" id="linkUrlInput" placeholder="https://example.com" dir="ltr">
+            <p class="link-dialog-err" id="linkDialogErr"></p>
+            <div class="link-dialog-actions">
+                <button type="button" class="btn-secondary" id="linkCancelBtn">إلغاء</button>
+                <button type="button" class="btn" id="linkConfirmBtn">إدراج الرابط</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    const titleInput = overlay.querySelector("#linkTitleInput");
+    const urlInput = overlay.querySelector("#linkUrlInput");
+    const err = overlay.querySelector("#linkDialogErr");
+    titleInput.value = defaultTitle || "";
+
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector("#linkCancelBtn").addEventListener("click", close);
+    document.addEventListener("keydown", function esc(e) {
+        if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
+    });
+
+    overlay.querySelector("#linkConfirmBtn").addEventListener("click", () => {
+        const title = titleInput.value.trim();
+        const url = urlInput.value.trim();
+        if (!title) { err.textContent = "اكتب عنوان الرابط الظاهر."; titleInput.focus(); return; }
+        if (!/^https?:\/\//i.test(url)) { err.textContent = "الرابط يجب أن يبدأ بـ http أو https."; urlInput.focus(); return; }
+        close();
+        onConfirm({ title, url });
+    });
+
+    // التركيز على الحقل المناسب
+    (defaultTitle ? urlInput : titleInput).focus();
 }
 
 /** يدرج نصاً عند موضع المؤشر في محرر المحتوى */

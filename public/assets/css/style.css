@@ -390,6 +390,15 @@ img { max-width: 100%; display: block; }
     font-style: italic;
     color: var(--color-text);
 }
+.article-content a {
+    color: var(--color-primary);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color var(--transition);
+    word-break: break-word;
+}
+.article-content a:hover { color: var(--color-accent-dark); }
 .article-content img { max-width: 100%; height: auto; border-radius: var(--radius-sm); margin: 20px 0; display: block; }
 .article-content figure { margin: 26px 0; }
 .article-content figure img { margin: 0 0 8px; width: 100%; }
