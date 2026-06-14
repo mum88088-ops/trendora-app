@@ -425,6 +425,20 @@ img { max-width: 100%; display: block; }
     height: 100%;
     border: 0;
 }
+/* طبقة حماية علوية: تحجب عنوان الفيديو وأزرار المشاركة/المشاهدة على يوتيوب */
+.article-content .video-embed .video-guard-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    z-index: 5;
+    background: transparent;
+    cursor: default;
+}
+@media (max-width: 600px) {
+    .article-content .video-embed .video-guard-top { height: 52px; }
+}
 
 .article-footer { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--color-border); }
 .tags { display: flex; flex-wrap: wrap; gap: 10px; }

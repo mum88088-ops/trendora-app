@@ -846,7 +846,7 @@ function insertVideoIntoContent() {
     let html;
     const ytId = youtubeId(clean);
     if (ytId) {
-        html = `\n<div class="video-embed"><iframe src="https://www.youtube.com/embed/${ytId}" title="فيديو" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>\n`;
+        html = `\n<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&iv_load_policy=3&playsinline=1" title="فيديو" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>\n`;
     } else if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(clean)) {
         html = `\n<div class="video-embed"><video src="${clean}" controls preload="metadata"></video></div>\n`;
     } else {

@@ -101,6 +101,48 @@ function renderArticle(a) {
         ${adUnit("ad-end")}
     `;
     activateAds();
+    enhanceVideoEmbeds(container);
+}
+
+/**
+ * يحوّل تضمينات يوتيوب إلى مشغّل احترافي محمي:
+ * - نطاق youtube-nocookie + إخفاء العلامة والفيديوهات المقترحة
+ * - حجب شريط العنوان وزر المشاركة (طبقة علوية)
+ * - منع القائمة بالزر الأيمن (نسخ الرابط/كود التضمين)
+ */
+function enhanceVideoEmbeds(root) {
+    const wraps = (root || document).querySelectorAll(".video-embed");
+    wraps.forEach((wrap) => {
+        if (wrap.dataset.protected === "1") return;
+        const iframe = wrap.querySelector("iframe");
+        if (iframe) {
+            const src = iframe.getAttribute("src") || "";
+            const m = src.match(/(?:embed\/)([\w-]{11})/) || src.match(/[?&]v=([\w-]{11})/);
+            if (m) {
+                const id = m[1];
+                const params = new URLSearchParams({
+                    rel: "0",
+                    modestbranding: "1",
+                    iv_load_policy: "3",
+                    playsinline: "1",
+                    controls: "1",
+                    fs: "1",
+                });
+                iframe.setAttribute("src", `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`);
+                iframe.setAttribute("loading", "lazy");
+            }
+        }
+        // طبقة علوية تحجب العنوان وزر المشاركة/المشاهدة لاحقاً
+        if (!wrap.querySelector(".video-guard-top")) {
+            const guard = document.createElement("div");
+            guard.className = "video-guard-top";
+            guard.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); });
+            wrap.appendChild(guard);
+        }
+        // منع نسخ الرابط/كود التضمين عبر الزر الأيمن
+        wrap.addEventListener("contextmenu", (e) => e.preventDefault());
+        wrap.dataset.protected = "1";
+    });
 }
 
 // Insert in-article ad slots between paragraphs (after 2nd and around middle)
