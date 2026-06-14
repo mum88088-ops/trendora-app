@@ -23,6 +23,7 @@
                 <p>سجّل الدخول لإدارة المقالات</p>
             </div>
             <form id="loginForm">
+                <input type="text" id="usernameInput" placeholder="اسم المستخدم (اتركه فارغاً إن كنت المالك)" autocomplete="username">
                 <input type="password" id="passwordInput" placeholder="كلمة المرور" required autocomplete="current-password">
                 <button type="submit" class="btn">دخول</button>
                 <p class="login-error" id="loginError"></p>
@@ -50,8 +51,11 @@
             <button class="tab-btn" data-view="categories">الأقسام</button>
             <button class="tab-btn" data-view="ads">الإعلانات</button>
             <button class="tab-btn" data-view="trash">🗑️ سلة المهملات</button>
+            <button class="tab-btn" data-view="users" data-owner-only>👥 المستخدمون</button>
             <button class="tab-btn" data-view="security">كلمة المرور</button>
         </nav>
+
+        <div class="role-banner" id="roleBanner" hidden></div>
 
         <div class="storage-warning" id="storageWarning" hidden></div>
 
@@ -375,6 +379,59 @@
                                 </tr>
                             </thead>
                             <tbody id="trashTbody">
+                                <tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- USERS VIEW (owner only) -->
+            <section class="view" id="view-users" hidden>
+                <div class="view-head">
+                    <h2>إدارة المستخدمين</h2>
+                </div>
+                <div class="settings-panel">
+                    <p class="panel-note">أنشئ حساباً لكاتب يساعدك في المحتوى، وحدّد الصلاحيات التي تريد منحه إياها. لا يرى الكاتب سوى ما تسمح له به.</p>
+
+                    <form id="userForm" class="editor-form" style="max-width:560px">
+                        <div class="field-row">
+                            <div class="field">
+                                <label>اسم المستخدم</label>
+                                <input type="text" id="newUserName" placeholder="مثال: writer_ahmed" required>
+                                <small class="field-hint">أحرف إنجليزية وأرقام و _ . - فقط (3-20 حرفاً) بدون مسافات.</small>
+                            </div>
+                            <div class="field">
+                                <label>كلمة المرور</label>
+                                <input type="text" id="newUserPass" placeholder="6 أحرف على الأقل" required>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>الصلاحيات الممنوحة</label>
+                            <div class="perm-list" id="permList"></div>
+                        </div>
+
+                        <div class="editor-actions">
+                            <button type="submit" class="btn">+ إنشاء المستخدم</button>
+                            <span class="save-msg" id="userSaveMsg"></span>
+                        </div>
+                    </form>
+
+                    <hr style="border:none;border-top:1px dashed var(--color-border);margin:24px 0">
+
+                    <h3 style="margin:0 0 12px">المستخدمون الحاليون</h3>
+                    <div class="table-wrap">
+                        <table class="articles-table">
+                            <thead>
+                                <tr>
+                                    <th>اسم المستخدم</th>
+                                    <th>الصلاحيات</th>
+                                    <th>تاريخ الإنشاء</th>
+                                    <th>إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTbody">
                                 <tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>
                             </tbody>
                         </table>

@@ -15,6 +15,17 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trendora2026";
+const OWNER_USERNAME = (process.env.ADMIN_USER || "admin").trim().toLowerCase();
+
+/* قائمة الصلاحيات المتاحة للكُتّاب */
+const PERMISSIONS = ["create", "publish", "delete", "ai", "settings"];
+const PERMISSION_LABELS = {
+  create: "إنشاء وتعديل المقالات",
+  publish: "نشر المقالات مباشرة (بدونها تُحفظ كمسودة)",
+  delete: "حذف المقالات",
+  ai: "استخدام أدوات الذكاء الاصطناعي",
+  settings: "إدارة الإعدادات والأقسام والإعلانات",
+};
 const SESSION_SECRET = process.env.SESSION_SECRET || "trendora-secret-change-me";
 const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
@@ -80,8 +91,28 @@ const upload = multer({
 
 /* ---------- auth middleware ---------- */
 function requireAuth(req, res, next) {
-  if (req.session && req.session.isAdmin) return next();
+  if (req.session && req.session.user) return next();
   return res.status(401).json({ error: "غير مصرح. يرجى تسجيل الدخول." });
+}
+
+function isOwner(req) {
+  return Boolean(req.session && req.session.user && req.session.user.role === "owner");
+}
+function userPerms(req) {
+  return (req.session && req.session.user && req.session.user.perms) || [];
+}
+function hasPerm(req, perm) {
+  return isOwner(req) || userPerms(req).includes(perm);
+}
+function requirePerm(perm) {
+  return (req, res, next) => {
+    if (hasPerm(req, perm)) return next();
+    return res.status(403).json({ error: "ليست لديك صلاحية لتنفيذ هذا الإجراء" });
+  };
+}
+function requireOwner(req, res, next) {
+  if (isOwner(req)) return next();
+  return res.status(403).json({ error: "هذا الإجراء متاح لمالك الموقع فقط" });
 }
 
 /* ---------- password hashing (scrypt) ---------- */
@@ -104,6 +135,29 @@ async function checkPassword(password) {
     return verifyPasswordHash(password, settings.passwordHash, settings.passwordSalt);
   }
   return password === ADMIN_PASSWORD;
+}
+
+/** يصادق على المستخدم: المالك (admin) أو أحد الكُتّاب المُضافين. يعيد كائن الجلسة أو null */
+async function authenticate(username, password) {
+  const u = String(username || "").trim().toLowerCase();
+  // المالك: اسم مستخدم فارغ أو يساوي اسم المالك
+  if (!u || u === OWNER_USERNAME) {
+    if (await checkPassword(password)) {
+      return { username: OWNER_USERNAME, role: "owner", perms: PERMISSIONS.slice() };
+    }
+    return null;
+  }
+  const settings = await store.getSettings();
+  const user = (settings.users || []).find(
+    (x) => String(x.username || "").toLowerCase() === u
+  );
+  if (user && verifyPasswordHash(password, user.passwordHash, user.passwordSalt)) {
+    const perms = Array.isArray(user.permissions)
+      ? user.permissions.filter((p) => PERMISSIONS.includes(p))
+      : [];
+    return { username: user.username, role: "writer", perms };
+  }
+  return null;
 }
 
 /* ---------- async route wrapper ---------- */
@@ -162,12 +216,13 @@ app.get(
 app.post(
   "/api/login",
   wrap(async (req, res) => {
-    const { password } = req.body || {};
-    if (await checkPassword(password)) {
-      req.session.isAdmin = true;
-      return res.json({ ok: true });
+    const { username, password } = req.body || {};
+    const session = await authenticate(username, password);
+    if (session) {
+      req.session.user = session;
+      return res.json({ ok: true, user: session });
     }
-    res.status(401).json({ error: "كلمة المرور غير صحيحة" });
+    res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
   })
 );
 
@@ -176,7 +231,14 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", (req, res) => {
-  res.json({ isAdmin: !!(req.session && req.session.isAdmin) });
+  const user = req.session && req.session.user;
+  res.json({
+    isAdmin: Boolean(user),
+    user: user
+      ? { username: user.username, role: user.role, perms: user.perms || [] }
+      : null,
+    permissionLabels: PERMISSION_LABELS,
+  });
 });
 
 /* ============================================================
@@ -203,11 +265,14 @@ app.get(
 app.post(
   "/api/admin/articles",
   requireAuth,
+  requirePerm("create"),
   wrap(async (req, res) => {
     const b = req.body || {};
     if (!b.title || !b.content) {
       return res.status(400).json({ error: "العنوان والمحتوى مطلوبان" });
     }
+    // من لا يملك صلاحية النشر: تُحفظ مقالاته كمسودة بانتظار مراجعة المالك
+    if (!hasPerm(req, "publish") && b.status === "published") b.status = "draft";
     const article = await store.create(b);
     res.json({ article });
   })
@@ -216,8 +281,11 @@ app.post(
 app.put(
   "/api/admin/articles/:id",
   requireAuth,
+  requirePerm("create"),
   wrap(async (req, res) => {
-    const article = await store.update(req.params.id, req.body || {});
+    const b = req.body || {};
+    if (!hasPerm(req, "publish") && b.status === "published") b.status = "draft";
+    const article = await store.update(req.params.id, b);
     if (!article) return res.status(404).json({ error: "المقال غير موجود" });
     res.json({ article });
   })
@@ -226,10 +294,14 @@ app.put(
 app.patch(
   "/api/admin/articles/:id/status",
   requireAuth,
+  requirePerm("create"),
   wrap(async (req, res) => {
     const { status } = req.body || {};
     if (!["published", "hidden", "draft"].includes(status)) {
       return res.status(400).json({ error: "حالة غير صالحة" });
+    }
+    if (status === "published" && !hasPerm(req, "publish")) {
+      return res.status(403).json({ error: "ليست لديك صلاحية نشر المقالات" });
     }
     const article = await store.setStatus(req.params.id, status);
     if (!article) return res.status(404).json({ error: "المقال غير موجود" });
@@ -240,6 +312,7 @@ app.patch(
 app.delete(
   "/api/admin/articles/:id",
   requireAuth,
+  requirePerm("delete"),
   wrap(async (req, res) => {
     const removed = await store.remove(req.params.id);
     if (!removed) return res.status(404).json({ error: "المقال غير موجود" });
@@ -259,6 +332,7 @@ app.get(
 app.post(
   "/api/admin/articles/:id/restore",
   requireAuth,
+  requirePerm("delete"),
   wrap(async (req, res) => {
     const article = await store.restore(req.params.id);
     if (!article) return res.status(404).json({ error: "المقال غير موجود" });
@@ -269,6 +343,7 @@ app.post(
 app.delete(
   "/api/admin/trash/:id",
   requireAuth,
+  requirePerm("delete"),
   wrap(async (req, res) => {
     const removed = await store.purge(req.params.id);
     if (!removed) return res.status(404).json({ error: "المقال غير موجود" });
@@ -296,6 +371,7 @@ app.get(
 app.put(
   "/api/admin/settings",
   requireAuth,
+  requirePerm("settings"),
   wrap(async (req, res) => {
     const { categories, homepageCount, adsense } = req.body || {};
     const patch = {};
@@ -350,6 +426,7 @@ app.put(
 app.post(
   "/api/admin/password",
   requireAuth,
+  requireOwner,
   wrap(async (req, res) => {
     const { current, next } = req.body || {};
     if (!next || String(next).length < 6) {
@@ -364,9 +441,117 @@ app.post(
   })
 );
 
+/* ---------- users management (owner only) ---------- */
+function publicUser(u) {
+  return {
+    id: u.id,
+    username: u.username,
+    permissions: u.permissions || [],
+    createdAt: u.createdAt || null,
+  };
+}
+
+app.get(
+  "/api/admin/users",
+  requireAuth,
+  requireOwner,
+  wrap(async (req, res) => {
+    const s = await store.getSettings();
+    res.json({
+      users: (s.users || []).map(publicUser),
+      permissions: PERMISSIONS,
+      permissionLabels: PERMISSION_LABELS,
+    });
+  })
+);
+
+app.post(
+  "/api/admin/users",
+  requireAuth,
+  requireOwner,
+  wrap(async (req, res) => {
+    const { username, password, permissions } = req.body || {};
+    const name = String(username || "").trim();
+    if (!/^[a-zA-Z0-9_.\-]{3,20}$/.test(name)) {
+      return res.status(400).json({
+        error: "اسم المستخدم: 3-20 حرفاً (أحرف إنجليزية/أرقام/_.- بدون مسافات)",
+      });
+    }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ error: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+    }
+    if (name.toLowerCase() === OWNER_USERNAME) {
+      return res.status(400).json({ error: "اسم المستخدم هذا محجوز للمالك" });
+    }
+    const s = await store.getSettings();
+    const users = s.users || [];
+    if (users.some((u) => String(u.username).toLowerCase() === name.toLowerCase())) {
+      return res.status(409).json({ error: "اسم المستخدم موجود بالفعل" });
+    }
+    const perms = Array.isArray(permissions)
+      ? permissions.filter((p) => PERMISSIONS.includes(p))
+      : [];
+    const { hash, salt } = hashPassword(password);
+    const user = {
+      id: crypto.randomUUID(),
+      username: name,
+      passwordHash: hash,
+      passwordSalt: salt,
+      permissions: perms,
+      createdAt: new Date().toISOString(),
+    };
+    users.push(user);
+    await store.saveSettings({ users });
+    res.json({ user: publicUser(user) });
+  })
+);
+
+app.put(
+  "/api/admin/users/:id",
+  requireAuth,
+  requireOwner,
+  wrap(async (req, res) => {
+    const { permissions, password } = req.body || {};
+    const s = await store.getSettings();
+    const users = s.users || [];
+    const user = users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: "المستخدم غير موجود" });
+    if (Array.isArray(permissions)) {
+      user.permissions = permissions.filter((p) => PERMISSIONS.includes(p));
+    }
+    if (password) {
+      if (String(password).length < 6) {
+        return res.status(400).json({ error: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+      }
+      const { hash, salt } = hashPassword(password);
+      user.passwordHash = hash;
+      user.passwordSalt = salt;
+    }
+    await store.saveSettings({ users });
+    res.json({ user: publicUser(user) });
+  })
+);
+
+app.delete(
+  "/api/admin/users/:id",
+  requireAuth,
+  requireOwner,
+  wrap(async (req, res) => {
+    const s = await store.getSettings();
+    const users = s.users || [];
+    const next = users.filter((u) => u.id !== req.params.id);
+    if (next.length === users.length) {
+      return res.status(404).json({ error: "المستخدم غير موجود" });
+    }
+    await store.saveSettings({ users: next });
+    res.json({ ok: true });
+  })
+);
+
 app.post(
   "/api/admin/upload",
   requireAuth,
+  requirePerm("create"),
   upload.single("image"),
   wrap(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "لم يتم رفع أي صورة" });
@@ -613,6 +798,7 @@ app.get("/api/admin/ai/providers", requireAuth, (req, res) => {
 app.post(
   "/api/admin/ai/generate",
   requireAuth,
+  requirePerm("ai"),
   wrap(async (req, res) => {
     const { topic, category, length, model } = req.body || {};
     let { provider } = req.body || {};
@@ -772,6 +958,7 @@ async function imageWithGemini(prompt) {
 app.post(
   "/api/admin/ai/image",
   requireAuth,
+  requirePerm("ai"),
   wrap(async (req, res) => {
     const { prompt } = req.body || {};
     let { provider } = req.body || {};

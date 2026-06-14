@@ -50,6 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("saveCategoriesBtn")?.addEventListener("click", saveCategories);
     $("saveAdsBtn")?.addEventListener("click", saveAds);
     $("passwordForm")?.addEventListener("submit", changePassword);
+    $("userForm")?.addEventListener("submit", createUser);
   } catch (err) {
     console.error("Admin init error:", err);
     const errEl = $("loginError");
@@ -67,10 +68,11 @@ async function handleLogin(e) {
 
     try {
         const password = $("passwordInput").value;
+        const username = $("usernameInput") ? $("usernameInput").value : "";
         const res = await api("/api/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({ username, password }),
         });
         if (res.ok) {
             showApp();
@@ -93,12 +95,80 @@ function showLogin() {
     $("loginScreen").hidden = false;
     $("adminApp").hidden = true;
 }
+let currentUser = { role: "owner", perms: [] };
+let permissionLabels = {};
+
 function showApp() {
     $("loginScreen").hidden = true;
     $("adminApp").hidden = false;
+    loadMe();
     loadArticles();
     loadAiProviders();
     loadSettings();
+}
+
+/** يحمّل بيانات المستخدم الحالي ويطبّق الصلاحيات على الواجهة */
+async function loadMe() {
+    try {
+        const me = await api("/api/me").then((r) => r.json());
+        currentUser = me.user || { role: "owner", perms: [] };
+        permissionLabels = me.permissionLabels || {};
+        applyPermissions();
+    } catch {
+        /* ignore */
+    }
+}
+
+function isOwnerUser() { return currentUser.role === "owner"; }
+function can(perm) { return isOwnerUser() || (currentUser.perms || []).includes(perm); }
+
+/** يُظهر/يُخفي التبويبات والأزرار حسب صلاحيات المستخدم الحالي */
+function applyPermissions() {
+    // التبويبات المخصصة للمالك فقط
+    document.querySelectorAll("[data-owner-only]").forEach((el) => {
+        el.style.display = isOwnerUser() ? "" : "none";
+    });
+
+    const tabMap = {
+        ai: can("ai"),
+        categories: can("settings"),
+        ads: can("settings"),
+        editor: can("create"),
+        trash: can("delete"),
+        security: isOwnerUser(),
+    };
+    Object.entries(tabMap).forEach(([view, allowed]) => {
+        const tab = document.querySelector(`.tab-btn[data-view="${view}"]`);
+        if (tab && !tab.hasAttribute("data-owner-only")) {
+            tab.style.display = allowed ? "" : "none";
+        }
+    });
+
+    // لافتة الدور
+    const banner = $("roleBanner");
+    if (banner) {
+        if (isOwnerUser()) {
+            banner.hidden = true;
+        } else {
+            const names = (currentUser.perms || [])
+                .map((p) => permissionLabels[p] || p)
+                .join("، ");
+            banner.innerHTML =
+                `مرحباً <strong>${escapeHtml(currentUser.username || "")}</strong> — صلاحياتك: ` +
+                (names ? escapeHtml(names) : "<em>محدودة (عرض فقط)</em>");
+            banner.hidden = false;
+        }
+    }
+
+    // إخفاء خيار النشر لمن لا يملك صلاحية النشر
+    const statusSel = $("fStatus");
+    if (statusSel && !can("publish")) {
+        const pubOpt = statusSel.querySelector('option[value="published"]');
+        if (pubOpt) {
+            pubOpt.disabled = true;
+            pubOpt.textContent = "منشور (يتطلب صلاحية النشر)";
+        }
+    }
 }
 
 /* ---------- settings (categories / ads / password) ---------- */
@@ -271,6 +341,150 @@ async function changePassword(e) {
     }
 }
 
+/* ---------- users management (owner only) ---------- */
+let availablePermissions = [];
+
+async function loadUsersView() {
+    const tbody = $("usersTbody");
+    if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>`;
+    try {
+        const res = await api("/api/admin/users");
+        if (res.status === 401) return handleUnauthorized();
+        if (res.status === 403) {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading">هذه الصفحة متاحة للمالك فقط.</td></tr>`;
+            return;
+        }
+        const data = await res.json();
+        availablePermissions = data.permissions || [];
+        permissionLabels = data.permissionLabels || permissionLabels;
+        buildPermCheckboxes();
+        renderUsers(data.users || []);
+    } catch {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading">تعذّر التحميل.</td></tr>`;
+    }
+}
+
+function buildPermCheckboxes(selected = []) {
+    const box = $("permList");
+    if (!box) return;
+    box.innerHTML = availablePermissions
+        .map(
+            (p) => `
+        <label class="perm-item">
+            <input type="checkbox" value="${p}" ${selected.includes(p) ? "checked" : ""}>
+            <span>${escapeHtml(permissionLabels[p] || p)}</span>
+        </label>`
+        )
+        .join("");
+}
+
+function selectedPerms() {
+    return Array.from(document.querySelectorAll('#permList input[type="checkbox"]:checked'))
+        .map((c) => c.value);
+}
+
+function renderUsers(users) {
+    const tbody = $("usersTbody");
+    if (!tbody) return;
+    if (!users.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="loading">لا يوجد مستخدمون بعد. أنشئ حساباً لكاتب.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = users
+        .map((u) => {
+            const badges = (u.permissions || []).length
+                ? u.permissions
+                      .map((p) => `<span class="perm-badge">${escapeHtml(permissionLabels[p] || p)}</span>`)
+                      .join("")
+                : `<span class="perm-badge none">عرض فقط</span>`;
+            const date = u.createdAt ? new Date(u.createdAt).toLocaleDateString("ar-EG") : "—";
+            return `
+        <tr data-id="${u.id}" data-perms="${escapeHtml((u.permissions || []).join(","))}">
+            <td><strong>${escapeHtml(u.username)}</strong></td>
+            <td><div class="perm-badges">${badges}</div></td>
+            <td>${date}</td>
+            <td>
+                <button class="btn-ghost" data-act="perms" data-id="${u.id}">الصلاحيات</button>
+                <button class="btn-ghost" data-act="pass" data-id="${u.id}">كلمة المرور</button>
+                <button class="btn-ghost danger" data-act="del" data-id="${u.id}">حذف</button>
+            </td>
+        </tr>`;
+        })
+        .join("");
+    tbody.querySelectorAll("button[data-act]").forEach((btn) =>
+        btn.addEventListener("click", () => userRowAction(btn.dataset.act, btn.dataset.id, btn))
+    );
+}
+
+async function createUser(e) {
+    e.preventDefault();
+    const msg = $("userSaveMsg");
+    const username = $("newUserName").value.trim();
+    const password = $("newUserPass").value;
+    const permissions = selectedPerms();
+    msg.textContent = "جارٍ الإنشاء...";
+    try {
+        const res = await api("/api/admin/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, permissions }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "فشل الإنشاء");
+        $("userForm").reset();
+        buildPermCheckboxes();
+        msg.textContent = "✓ تم إنشاء المستخدم. شارك معه اسم المستخدم وكلمة المرور.";
+        loadUsersView();
+    } catch (err) {
+        msg.textContent = err.message;
+    }
+}
+
+async function userRowAction(act, id, btn) {
+    if (act === "del") {
+        if (!confirm("حذف هذا المستخدم نهائياً؟")) return;
+        const res = await api(`/api/admin/users/${id}`, { method: "DELETE" });
+        if (res.ok) loadUsersView();
+        else alert("تعذّر حذف المستخدم.");
+        return;
+    }
+    if (act === "pass") {
+        const password = prompt("كلمة المرور الجديدة لهذا المستخدم (6 أحرف على الأقل):");
+        if (!password) return;
+        const res = await api(`/api/admin/users/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) alert("✓ تم تحديث كلمة المرور.");
+        else alert(data.error || "تعذّر التحديث.");
+        return;
+    }
+    if (act === "perms") {
+        const row = btn.closest("tr");
+        const current = (row.dataset.perms || "").split(",").map((s) => s.trim()).filter(Boolean);
+        const choice = prompt(
+            "أدخل الصلاحيات مفصولة بفاصلة من بين:\n" +
+                availablePermissions.map((p) => `${p} = ${permissionLabels[p] || p}`).join("\n") +
+                "\n\nالحالية: " + (current.join(", ") || "لا شيء"),
+            current.join(", ")
+        );
+        if (choice === null) return;
+        const permissions = choice
+            .split(",")
+            .map((s) => s.trim())
+            .filter((p) => availablePermissions.includes(p));
+        const res = await api(`/api/admin/users/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ permissions }),
+        });
+        if (res.ok) loadUsersView();
+        else alert("تعذّر تحديث الصلاحيات.");
+    }
+}
+
 /** يعيد المستخدم لشاشة الدخول إذا انتهت الجلسة (مثلاً بعد إعادة نشر Render) */
 function handleUnauthorized() {
     showLogin();
@@ -282,13 +496,14 @@ function handleUnauthorized() {
 function switchView(view, btn) {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     if (btn) btn.classList.add("active");
-    ["list", "editor", "ai", "categories", "ads", "trash", "security"].forEach(
-        (v) => ($(`view-${v}`).hidden = v !== view)
+    ["list", "editor", "ai", "categories", "ads", "trash", "users", "security"].forEach(
+        (v) => { const el = $(`view-${v}`); if (el) el.hidden = v !== view; }
     );
     if (view === "list") loadArticles();
     if (view === "categories") loadCategoriesView();
     if (view === "ads") loadAdsView();
     if (view === "trash") loadTrash();
+    if (view === "users") loadUsersView();
 }
 function switchTo(view) {
     const btn = document.querySelector(`.tab-btn[data-view="${view}"]`);
