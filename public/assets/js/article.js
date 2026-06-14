@@ -2,24 +2,47 @@
 
 let siteAds = { clientId: "", inArticleCode: "" };
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
     const slug = getSlug();
     if (!slug) {
         showError("لم يتم تحديد المقال.");
         return;
     }
-    await loadAdsConfig();
+    // نجلب إعدادات الإعلانات بالتوازي مع المقال (دون انتظار) لتسريع العرض
+    loadAdsConfig().then(() => activateAds());
     loadArticle(slug);
 });
 
 async function loadAdsConfig() {
     try {
+        const cached = sessionStorage.getItem("pf:settings");
+        if (cached) {
+            const c = JSON.parse(cached);
+            if (c && Date.now() - c.t < 30 * 60 * 1000) {
+                siteAds = c.data.adsense || siteAds;
+                return;
+            }
+        }
+    } catch { /* ignore */ }
+    try {
         const res = await fetch("/api/settings");
         const data = await res.json();
         siteAds = data.adsense || siteAds;
+        try { sessionStorage.setItem("pf:settings", JSON.stringify({ t: Date.now(), data })); } catch { /* ignore */ }
     } catch {
         /* ignore */
     }
+}
+
+/* يقرأ المقال المُحمّل مسبقاً (عند المرور على الرابط) لعرضٍ فوري */
+function readPrefetchedArticle(slug) {
+    try {
+        const raw = sessionStorage.getItem("pf:article:" + slug);
+        if (!raw) return null;
+        const c = JSON.parse(raw);
+        if (c && c.article && Date.now() - c.t < 5 * 60 * 1000) return c.article;
+    } catch { /* ignore */ }
+    return null;
 }
 
 /** يبني وحدة إعلانية: كود الأدمن المخصّص أو وحدة AdSense تلقائية، أو عنصر نائب */
@@ -58,16 +81,24 @@ function getSlug() {
 }
 
 async function loadArticle(slug) {
-    const container = document.getElementById("articleContainer");
+    // عرض فوري من النسخة المُحمّلة مسبقاً إن وُجدت
+    const cached = readPrefetchedArticle(slug);
+    if (cached) {
+        renderArticle(cached);
+        updateSeo(cached);
+        loadSidebars(cached);
+    }
     try {
         const res = await fetch(`/api/articles/${encodeURIComponent(slug)}`);
         if (!res.ok) throw new Error("not found");
         const { article } = await res.json();
-        renderArticle(article);
-        updateSeo(article);
-        loadSidebars(article);
+        if (!cached) {
+            renderArticle(article);
+            updateSeo(article);
+            loadSidebars(article);
+        }
     } catch {
-        showError("المقال غير موجود أو غير منشور.");
+        if (!cached) showError("المقال غير موجود أو غير منشور.");
     }
 }
 

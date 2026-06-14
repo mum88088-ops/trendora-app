@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initNav();
     initContentModals();
     initContactForm();
+    initInstantNav();
     setYear();
 
     const grid = document.getElementById("articleGrid");
@@ -99,11 +100,11 @@ function renderArticles(articles) {
 
 /* ===== shared helpers ===== */
 
-/* يجلب أقسام الموقع من الخادم (مع التراجع للأقسام الافتراضية عند الفشل) */
+/* يجلب أقسام الموقع من الخادم (مع التراجع للأقسام الافتراضية عند الفشل)
+   مع تخزين مؤقت في sessionStorage لتسريع التنقّل بين الصفحات */
 async function loadSiteSettings() {
     try {
-        const res = await fetch("/api/settings");
-        const data = await res.json();
+        const data = await getSettingsCached();
         if (Array.isArray(data.categories) && data.categories.length) {
             CATEGORIES = data.categories;
         }
@@ -112,6 +113,22 @@ async function loadSiteSettings() {
     } catch {
         /* يبقى الافتراضي */
     }
+}
+
+/* تخزين إعدادات الموقع مؤقتاً (30 دقيقة) لتفادي إعادة الجلب عند كل تنقّل */
+const SETTINGS_TTL = 30 * 60 * 1000;
+async function getSettingsCached() {
+    try {
+        const raw = sessionStorage.getItem("pf:settings");
+        if (raw) {
+            const c = JSON.parse(raw);
+            if (c && Date.now() - c.t < SETTINGS_TTL) return c.data;
+        }
+    } catch { /* ignore */ }
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+    try { sessionStorage.setItem("pf:settings", JSON.stringify({ t: Date.now(), data })); } catch { /* ignore */ }
+    return data;
 }
 
 /* إعلان علوي في الصفحة الرئيسية */
@@ -195,6 +212,84 @@ function initNav() {
 function setYear() {
     const el = document.getElementById("year");
     if (el) el.textContent = new Date().getFullYear();
+}
+
+/* ===== تنقّل فوري وسلس (مثل المواقع الإخبارية الكبرى) =====
+   1) Speculation Rules: تُحمّل صفحات المقالات مسبقاً في الخلفية عند تمرير المؤشر
+      فوق الرابط (في Chrome/Edge) فتفتح فوراً عند النقر.
+   2) كحل بديل للمتصفحات الأخرى: نجلب الصفحة وبيانات المقال مسبقاً عند المرور/اللمس. */
+const _prefetched = new Set();
+
+function initInstantNav() {
+    const supportsSR = "supports" in HTMLScriptElement && HTMLScriptElement.supports("speculationrules");
+    if (supportsSR) addSpeculationRules();
+    initHoverPrefetch(supportsSR);
+}
+
+function addSpeculationRules() {
+    if (document.getElementById("trendora-spec-rules")) return;
+    const rules = {
+        prerender: [
+            {
+                source: "document",
+                where: {
+                    and: [
+                        { href_matches: "/*" },
+                        { not: { href_matches: "/admin*" } },
+                        { not: { selector_matches: ".no-prefetch" } },
+                        { not: { selector_matches: "[target=_blank]" } }
+                    ]
+                },
+                eagerness: "moderate"
+            }
+        ]
+    };
+    const s = document.createElement("script");
+    s.type = "speculationrules";
+    s.id = "trendora-spec-rules";
+    s.textContent = JSON.stringify(rules);
+    document.body.appendChild(s);
+}
+
+function initHoverPrefetch(supportsSR) {
+    const handler = (e) => {
+        const link = e.target.closest("a");
+        if (!link) return;
+        if (link.target === "_blank" || link.classList.contains("no-prefetch")) return;
+        const href = link.getAttribute("href") || "";
+        if (!href.startsWith("/article/")) return;
+        const slug = decodeURIComponent(href.split("/article/")[1] || "").split(/[?#]/)[0];
+        if (slug) prefetchArticleApi(slug);
+        if (!supportsSR) prefetchPage(link.href);
+    };
+    document.addEventListener("mouseover", handler, { passive: true });
+    document.addEventListener("touchstart", handler, { passive: true });
+}
+
+function prefetchPage(url) {
+    if (_prefetched.has(url)) return;
+    _prefetched.add(url);
+    const l = document.createElement("link");
+    l.rel = "prefetch";
+    l.href = url;
+    document.head.appendChild(l);
+}
+
+/* يجلب بيانات المقال مسبقاً ويخزّنها لعرضها فوراً عند فتح المقال */
+function prefetchArticleApi(slug) {
+    const key = "pf:article:" + slug;
+    if (_prefetched.has(key)) return;
+    _prefetched.add(key);
+    fetch(`/api/articles/${encodeURIComponent(slug)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+            if (data && data.article) {
+                try {
+                    sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), article: data.article }));
+                } catch { /* ignore */ }
+            }
+        })
+        .catch(() => { /* ignore */ });
 }
 
 /* نموذج اتصل بنا: يفتح بريد المستخدم بالرسالة جاهزة (بدون خادم بريد) */

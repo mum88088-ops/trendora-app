@@ -1,5 +1,8 @@
 /* ===== Trendora ترندورا — Main Stylesheet ===== */
 
+/* انتقال سلس بين الصفحات (يُدعَم تدريجياً في المتصفحات الحديثة) */
+@view-transition { navigation: auto; }
+
 :root {
     --color-primary: #1e3a8a;
     --color-primary-dark: #0f1f4b;
