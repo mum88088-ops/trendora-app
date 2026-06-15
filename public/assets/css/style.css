@@ -98,6 +98,7 @@ img { max-width: 100%; display: block; }
     margin-top: 3px;
 }
 
+.main-nav { flex: 1; display: flex; justify-content: center; }
 .main-nav ul { display: flex; list-style: none; gap: 6px; }
 .main-nav a {
     display: block;
@@ -1091,6 +1092,7 @@ body.modal-open { overflow: hidden; }
 @media (max-width: 640px) {
     .nav-toggle { display: flex; }
     .main-nav {
+        display: block;
         position: absolute;
         top: 76px; right: 0; left: 0;
         background-color: var(--color-surface);
