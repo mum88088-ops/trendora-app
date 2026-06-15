@@ -191,6 +191,63 @@ app.get(
   })
 );
 
+/* ---------- comments (public) ---------- */
+// حد بسيط لمنع الإغراق: 5 تعليقات لكل IP خلال 5 دقائق
+const commentHits = new Map();
+function commentRateLimit(req, res, next) {
+  const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000;
+  const arr = (commentHits.get(ip) || []).filter((t) => now - t < windowMs);
+  if (arr.length >= 5) {
+    return res.status(429).json({ error: "لقد أرسلت تعليقات كثيرة. حاول بعد قليل." });
+  }
+  arr.push(now);
+  commentHits.set(ip, arr);
+  next();
+}
+
+app.get(
+  "/api/articles/:idOrSlug/comments",
+  wrap(async (req, res) => {
+    const article = await store.getPublic(req.params.idOrSlug);
+    if (!article) return res.status(404).json({ error: "المقال غير موجود" });
+    const comments = await store.listComments(article.id);
+    res.set("Cache-Control", "no-store");
+    res.json({ comments });
+  })
+);
+
+app.post(
+  "/api/articles/:idOrSlug/comments",
+  commentRateLimit,
+  wrap(async (req, res) => {
+    const article = await store.getPublic(req.params.idOrSlug);
+    if (!article) return res.status(404).json({ error: "المقال غير موجود" });
+    const name = String((req.body && req.body.name) || "").trim();
+    const body = String((req.body && req.body.body) || "").trim();
+    if (name.length < 2 || name.length > 40) {
+      return res.status(400).json({ error: "يرجى إدخال اسم صحيح (2 إلى 40 حرفاً)" });
+    }
+    if (body.length < 2 || body.length > 1000) {
+      return res.status(400).json({ error: "التعليق يجب أن يكون بين 2 و1000 حرف" });
+    }
+    const comment = await store.addComment(article.id, { name, body });
+    res.json({ comment });
+  })
+);
+
+app.delete(
+  "/api/admin/comments/:id",
+  requireAuth,
+  requirePerm("delete"),
+  wrap(async (req, res) => {
+    const ok = await store.deleteComment(req.params.id);
+    if (!ok) return res.status(404).json({ error: "التعليق غير موجود" });
+    res.json({ ok: true });
+  })
+);
+
 /* الإعدادات العامة (أقسام + إعلانات) — تُستخدم في الواجهة */
 app.get(
   "/api/settings",

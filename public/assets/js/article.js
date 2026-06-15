@@ -133,6 +133,161 @@ function renderArticle(a) {
     `;
     activateAds();
     enhanceVideoEmbeds(container);
+    initShareBar(a);
+    initComments(a.slug || getSlug());
+}
+
+/* ===== أزرار المشاركة العائمة ===== */
+function initShareBar(a) {
+    const old = document.getElementById("shareFab");
+    if (old) old.remove();
+
+    const url = `${location.origin}/article/${encodeURIComponent(a.slug || getSlug())}`;
+    const title = a.title || document.title;
+    const eUrl = encodeURIComponent(url);
+    const eTitle = encodeURIComponent(title);
+
+    const fab = document.createElement("div");
+    fab.className = "share-fab";
+    fab.id = "shareFab";
+    fab.innerHTML = `
+        <div class="share-options" id="shareOptions">
+            <a class="share-btn share-wa" href="https://wa.me/?text=${eTitle}%20${eUrl}" target="_blank" rel="noopener" aria-label="مشاركة على واتساب" title="واتساب">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.59 5.353l-.999 3.648 3.909-1.024zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            </a>
+            <a class="share-btn share-fb" href="https://www.facebook.com/sharer/sharer.php?u=${eUrl}" target="_blank" rel="noopener" aria-label="مشاركة على فيسبوك" title="فيسبوك">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            </a>
+            <a class="share-btn share-x" href="https://twitter.com/intent/tweet?url=${eUrl}&text=${eTitle}" target="_blank" rel="noopener" aria-label="مشاركة على X" title="X (تويتر)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a class="share-btn share-tg" href="https://t.me/share/url?url=${eUrl}&text=${eTitle}" target="_blank" rel="noopener" aria-label="مشاركة على تيليجرام" title="تيليجرام">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            </a>
+            <button type="button" class="share-btn share-copy" id="shareCopy" aria-label="نسخ الرابط" title="نسخ الرابط">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+            </button>
+        </div>
+        <button type="button" class="share-toggle" id="shareToggle" aria-label="مشاركة المقال" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+        </button>
+    `;
+    document.body.appendChild(fab);
+
+    const toggle = fab.querySelector("#shareToggle");
+    toggle.addEventListener("click", async () => {
+        // على الجوال: استخدم مشاركة النظام إن توفّرت
+        if (navigator.share && window.matchMedia("(max-width: 720px)").matches) {
+            try {
+                await navigator.share({ title, url });
+                return;
+            } catch { /* المستخدم ألغى؛ نُظهر الأزرار */ }
+        }
+        const open = fab.classList.toggle("open");
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    fab.querySelector("#shareCopy").addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText(url);
+            flashShareCopy(fab, "تم نسخ الرابط");
+        } catch {
+            flashShareCopy(fab, url);
+        }
+    });
+}
+
+function flashShareCopy(fab, msg) {
+    let tip = fab.querySelector(".share-tip");
+    if (!tip) {
+        tip = document.createElement("div");
+        tip.className = "share-tip";
+        fab.appendChild(tip);
+    }
+    tip.textContent = msg;
+    tip.classList.add("show");
+    setTimeout(() => tip.classList.remove("show"), 1800);
+}
+
+/* ===== التعليقات ===== */
+function initComments(slug) {
+    const form = document.getElementById("commentForm");
+    if (!form) return;
+    loadComments(slug);
+
+    if (form.dataset.bound === "1") return;
+    form.dataset.bound = "1";
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const nameEl = document.getElementById("commentName");
+        const bodyEl = document.getElementById("commentBody");
+        const msg = document.getElementById("commentMsg");
+        const btn = document.getElementById("commentSubmit");
+        const name = nameEl.value.trim();
+        const body = bodyEl.value.trim();
+        if (name.length < 2 || body.length < 2) {
+            setCommentMsg(msg, "يرجى إدخال الاسم والتعليق.", "err");
+            return;
+        }
+        btn.disabled = true;
+        setCommentMsg(msg, "جارٍ الإرسال...", "");
+        try {
+            const res = await fetch(`/api/articles/${encodeURIComponent(slug)}/comments`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, body }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "تعذّر إرسال التعليق");
+            bodyEl.value = "";
+            setCommentMsg(msg, "تم نشر تعليقك. شكراً لمشاركتك!", "ok");
+            loadComments(slug);
+        } catch (err) {
+            setCommentMsg(msg, err.message || "تعذّر إرسال التعليق", "err");
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
+function setCommentMsg(el, text, type) {
+    if (!el) return;
+    el.textContent = text;
+    el.className = "comment-msg" + (type ? " " + type : "");
+}
+
+async function loadComments(slug) {
+    const list = document.getElementById("commentsList");
+    const countEl = document.getElementById("commentsCount");
+    if (!list) return;
+    try {
+        const res = await fetch(`/api/articles/${encodeURIComponent(slug)}/comments`);
+        const data = await res.json();
+        const comments = data.comments || [];
+        if (countEl) countEl.textContent = comments.length ? `(${comments.length})` : "";
+        if (!comments.length) {
+            list.innerHTML = `<p class="comments-empty">لا توجد تعليقات بعد. كن أول من يعلّق!</p>`;
+            return;
+        }
+        list.innerHTML = comments
+            .map((c) => {
+                const initial = escapeHtml((c.name || "؟").trim().charAt(0));
+                return `
+                <div class="comment-item">
+                    <div class="comment-avatar" aria-hidden="true">${initial}</div>
+                    <div class="comment-body">
+                        <div class="comment-head">
+                            <span class="comment-author">${escapeHtml(c.name)}</span>
+                            <span class="comment-date">${formatDate(c.createdAt)}</span>
+                        </div>
+                        <p class="comment-text">${escapeHtml(c.body)}</p>
+                    </div>
+                </div>`;
+            })
+            .join("");
+    } catch {
+        list.innerHTML = `<p class="comments-empty">تعذّر تحميل التعليقات.</p>`;
+    }
 }
 
 /**

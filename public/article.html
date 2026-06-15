@@ -72,6 +72,27 @@
                     <p class="empty-state">جارٍ تحميل المقال...</p>
                 </article>
 
+                <section class="comments-section" id="commentsSection">
+                    <h2 class="section-title">التعليقات <span class="comments-count" id="commentsCount"></span></h2>
+
+                    <form class="comment-form" id="commentForm" novalidate>
+                        <div class="comment-form-row">
+                            <input type="text" id="commentName" name="name" placeholder="الاسم" maxlength="40" autocomplete="name" required>
+                        </div>
+                        <div class="comment-form-row">
+                            <textarea id="commentBody" name="body" placeholder="اكتب تعليقك هنا..." maxlength="1000" rows="3" required></textarea>
+                        </div>
+                        <div class="comment-form-actions">
+                            <span class="comment-msg" id="commentMsg"></span>
+                            <button type="submit" class="btn-comment" id="commentSubmit">إضافة تعليق</button>
+                        </div>
+                    </form>
+
+                    <div class="comments-list" id="commentsList">
+                        <p class="comments-empty" id="commentsEmpty">جارٍ تحميل التعليقات...</p>
+                    </div>
+                </section>
+
                 <section class="related-articles">
                     <h2 class="section-title">مقالات ذات صلة</h2>
                     <div class="article-grid" id="relatedGrid"></div>
