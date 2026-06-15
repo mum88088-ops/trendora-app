@@ -428,6 +428,42 @@ app.delete(
   })
 );
 
+/* استعادة جماعية من سلة المهملات */
+app.post(
+  "/api/admin/trash/bulk-restore",
+  requireAuth,
+  requirePerm("delete"),
+  wrap(async (req, res) => {
+    const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ error: "لم يتم تحديد أي مقال" });
+    let restored = 0;
+    for (const id of ids) {
+      try {
+        if (await store.restore(id)) restored++;
+      } catch { /* continue */ }
+    }
+    res.json({ ok: true, restored });
+  })
+);
+
+/* حذف نهائي جماعي من سلة المهملات */
+app.post(
+  "/api/admin/trash/bulk-purge",
+  requireAuth,
+  requirePerm("delete"),
+  wrap(async (req, res) => {
+    const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ error: "لم يتم تحديد أي مقال" });
+    let purged = 0;
+    for (const id of ids) {
+      try {
+        if (await store.purge(id)) purged++;
+      } catch { /* continue */ }
+    }
+    res.json({ ok: true, purged });
+  })
+);
+
 /* ---------- settings management (protected) ---------- */
 app.get(
   "/api/admin/settings",

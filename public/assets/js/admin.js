@@ -56,6 +56,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("bulkDeleteBtn")?.addEventListener("click", bulkDeleteSelected);
     $("selectAllArticles")?.addEventListener("change", toggleSelectAll);
     $("articleSearchInput")?.addEventListener("input", filterArticlesList);
+
+    $("selectAllTrash")?.addEventListener("change", toggleSelectAllTrash);
+    $("trashSearchInput")?.addEventListener("input", filterTrashList);
+    $("trashBulkRestoreBtn")?.addEventListener("click", bulkRestoreTrash);
+    $("trashBulkPurgeBtn")?.addEventListener("click", bulkPurgeTrash);
   } catch (err) {
     console.error("Admin init error:", err);
     const errEl = $("loginError");
@@ -697,42 +702,176 @@ async function rowAction(act, id, tr) {
 }
 
 /* ---------- trash ---------- */
+let trashCache = [];
+
 async function loadTrash() {
     const tbody = $("trashTbody");
-    tbody.innerHTML = `<tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>`;
     try {
         const res = await api("/api/admin/trash");
         if (res.status === 401) return handleUnauthorized();
         const { articles } = await res.json();
-        if (!articles.length) {
-            tbody.innerHTML = `<tr><td colspan="4" class="loading">سلة المهملات فارغة.</td></tr>`;
+        trashCache = articles || [];
+        renderTrashTable(trashCache);
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="5" class="loading">تعذّر التحميل.</td></tr>`;
+    }
+}
+
+function renderTrashTable(articles) {
+    const tbody = $("trashTbody");
+    resetTrashBulkSelection();
+    if (!articles.length) {
+        const hasSearch = ($("trashSearchInput")?.value || "").trim();
+        tbody.innerHTML = `<tr><td colspan="5" class="loading">${hasSearch ? "لا توجد نتائج مطابقة." : "سلة المهملات فارغة."}</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = articles.map(trashRowHtml).join("");
+    bindTrashRowActions();
+    bindTrashCheckboxes();
+}
+
+function trashRowHtml(a) {
+    return `
+    <tr data-id="${a.id}">
+        <td class="col-check"><input type="checkbox" class="trash-check" value="${escapeAttr(a.id)}" aria-label="تحديد المقال"></td>
+        <td class="article-title-cell">${escapeHtml(a.title)}</td>
+        <td>${escapeHtml(a.category)}</td>
+        <td>${formatDate(a.deletedAt)}</td>
+        <td>
+            <div class="row-actions">
+                <button data-act="restore">استعادة</button>
+                <button data-act="purge" class="danger">حذف نهائي</button>
+            </div>
+        </td>
+    </tr>`;
+}
+
+function filterTrashList() {
+    const q = ($("trashSearchInput")?.value || "").trim().toLowerCase();
+    if (!q) {
+        renderTrashTable(trashCache);
+        return;
+    }
+    const filtered = trashCache.filter((a) => {
+        const title = (a.title || "").toLowerCase();
+        const cat = (a.category || "").toLowerCase();
+        return title.includes(q) || cat.includes(q);
+    });
+    renderTrashTable(filtered);
+}
+
+function bindTrashCheckboxes() {
+    document.querySelectorAll("#trashTbody .trash-check").forEach((cb) => {
+        cb.addEventListener("change", updateTrashBulkBar);
+    });
+}
+
+function getSelectedTrashIds() {
+    return [...document.querySelectorAll("#trashTbody .trash-check:checked")].map((cb) => cb.value);
+}
+
+function updateTrashBulkBar() {
+    const ids = getSelectedTrashIds();
+    const bar = $("trashBulkActions");
+    const countEl = $("trashBulkCount");
+    const selectAll = $("selectAllTrash");
+    const visible = document.querySelectorAll("#trashTbody .trash-check");
+    const checked = document.querySelectorAll("#trashTbody .trash-check:checked");
+    if (bar) bar.hidden = ids.length === 0;
+    if (countEl) countEl.textContent = `${ids.length} محدّد`;
+    if (selectAll && visible.length) {
+        selectAll.checked = checked.length === visible.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < visible.length;
+    }
+}
+
+function resetTrashBulkSelection() {
+    const selectAll = $("selectAllTrash");
+    if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    }
+    const bar = $("trashBulkActions");
+    if (bar) bar.hidden = true;
+}
+
+function toggleSelectAllTrash() {
+    const selectAll = $("selectAllTrash");
+    const checked = selectAll?.checked || false;
+    document.querySelectorAll("#trashTbody .trash-check").forEach((cb) => {
+        cb.checked = checked;
+    });
+    updateTrashBulkBar();
+}
+
+async function bulkRestoreTrash() {
+    const ids = getSelectedTrashIds();
+    if (!ids.length) return;
+    const msg = ids.length === 1
+        ? "استعادة هذا المقال؟"
+        : `استعادة ${ids.length} مقالاً من سلة المهملات؟`;
+    if (!confirm(msg)) return;
+    const btn = $("trashBulkRestoreBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "جارٍ الاستعادة..."; }
+    try {
+        const res = await api("/api/admin/trash/bulk-restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+        });
+        if (res.status === 401) return handleUnauthorized();
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || "تعذّر استعادة المقالات.");
             return;
         }
-        tbody.innerHTML = articles
-            .map(
-                (a) => `
-            <tr data-id="${a.id}">
-                <td class="article-title-cell">${escapeHtml(a.title)}</td>
-                <td>${escapeHtml(a.category)}</td>
-                <td>${formatDate(a.deletedAt)}</td>
-                <td>
-                    <div class="row-actions">
-                        <button data-act="restore">استعادة</button>
-                        <button data-act="purge" class="danger">حذف نهائي</button>
-                    </div>
-                </td>
-            </tr>`
-            )
-            .join("");
-        tbody.querySelectorAll("tr").forEach((tr) => {
-            const id = tr.dataset.id;
-            tr.querySelectorAll("button").forEach((btn) =>
-                btn.addEventListener("click", () => trashAction(btn.dataset.act, id))
-            );
-        });
+        if ($("trashSearchInput")) $("trashSearchInput").value = "";
+        loadTrash();
     } catch {
-        tbody.innerHTML = `<tr><td colspan="4" class="loading">تعذّر التحميل.</td></tr>`;
+        alert("تعذّر الاتصال بالخادم.");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "استعادة المحدّد"; }
     }
+}
+
+async function bulkPurgeTrash() {
+    const ids = getSelectedTrashIds();
+    if (!ids.length) return;
+    const msg = ids.length === 1
+        ? "حذف هذا المقال نهائياً؟ لا يمكن التراجع."
+        : `حذف ${ids.length} مقالاً نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`;
+    if (!confirm(msg)) return;
+    const btn = $("trashBulkPurgeBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "جارٍ الحذف..."; }
+    try {
+        const res = await api("/api/admin/trash/bulk-purge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+        });
+        if (res.status === 401) return handleUnauthorized();
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || "تعذّر الحذف النهائي.");
+            return;
+        }
+        if ($("trashSearchInput")) $("trashSearchInput").value = "";
+        loadTrash();
+    } catch {
+        alert("تعذّر الاتصال بالخادم.");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "حذف نهائي"; }
+    }
+}
+
+function bindTrashRowActions() {
+    document.querySelectorAll("#trashTbody tr").forEach((tr) => {
+        const id = tr.dataset.id;
+        tr.querySelectorAll("button").forEach((btn) =>
+            btn.addEventListener("click", () => trashAction(btn.dataset.act, id))
+        );
+    });
 }
 
 async function trashAction(act, id) {

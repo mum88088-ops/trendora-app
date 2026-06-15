@@ -381,10 +381,23 @@
                 </div>
                 <div class="settings-panel">
                     <p class="panel-note">المقالات المحذوفة تبقى هنا. يمكنك استعادتها أو حذفها نهائياً.</p>
+
+                    <div class="articles-toolbar">
+                        <div class="admin-search-box">
+                            <input type="search" id="trashSearchInput" placeholder="ابحث في سلة المهملات..." aria-label="بحث في سلة المهملات">
+                        </div>
+                        <div class="bulk-actions bulk-actions-trash" id="trashBulkActions" hidden>
+                            <span class="bulk-count" id="trashBulkCount">0 محدّد</span>
+                            <button type="button" class="btn-outline" id="trashBulkRestoreBtn">استعادة المحدّد</button>
+                            <button type="button" class="btn-danger" id="trashBulkPurgeBtn">حذف نهائي</button>
+                        </div>
+                    </div>
+
                     <div class="table-wrap">
                         <table class="articles-table">
                             <thead>
                                 <tr>
+                                    <th class="col-check"><input type="checkbox" id="selectAllTrash" title="تحديد الكل" aria-label="تحديد كل المقالات في سلة المهملات"></th>
                                     <th>العنوان</th>
                                     <th>التصنيف</th>
                                     <th>تاريخ الحذف</th>
@@ -392,7 +405,7 @@
                                 </tr>
                             </thead>
                             <tbody id="trashTbody">
-                                <tr><td colspan="4" class="loading">جارٍ التحميل...</td></tr>
+                                <tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>
                             </tbody>
                         </table>
                     </div>
