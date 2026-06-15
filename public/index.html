@@ -83,21 +83,38 @@
         <div class="container" id="topAdSlot"></div>
 
         <section class="articles container" id="articlesSection">
-            <div class="toolbar">
-                <div class="filters" id="filters">
-                    <button class="filter-btn active" data-cat="all">الكل</button>
-                    <button class="filter-btn" data-cat="الرياضة">الرياضة</button>
-                    <button class="filter-btn" data-cat="أسعار الذهب والعملات">أسعار الذهب والعملات</button>
-                    <button class="filter-btn" data-cat="المرتبات والأجور">المرتبات والأجور</button>
-                </div>
-                <div class="search-box">
-                    <input type="search" id="searchInput" placeholder="ابحث عن مقال..." aria-label="بحث">
-                </div>
-            </div>
+            <div class="home-layout">
+                <div class="home-main">
+                    <div class="toolbar">
+                        <div class="filters" id="filters">
+                            <button class="filter-btn active" data-cat="all">الكل</button>
+                            <button class="filter-btn" data-cat="الرياضة">الرياضة</button>
+                            <button class="filter-btn" data-cat="أسعار الذهب والعملات">أسعار الذهب والعملات</button>
+                            <button class="filter-btn" data-cat="المرتبات والأجور">المرتبات والأجور</button>
+                        </div>
+                        <div class="search-box">
+                            <input type="search" id="searchInput" placeholder="ابحث عن مقال..." aria-label="بحث">
+                        </div>
+                    </div>
 
-            <h2 class="section-title">أحدث المقالات</h2>
-            <div class="article-grid" id="articleGrid">
-                <div class="empty-state">جارٍ تحميل المقالات...</div>
+                    <h2 class="section-title">أحدث المقالات</h2>
+                    <div class="article-grid" id="articleGrid">
+                        <div class="empty-state">جارٍ تحميل المقالات...</div>
+                    </div>
+                </div>
+
+                <aside class="home-aside" id="homeAside" aria-label="مقالات مختارة">
+                    <div class="spotlight" id="spotlight">
+                        <div class="spotlight-head">
+                            <h3 class="spotlight-title">الأبرز الآن</h3>
+                            <span class="spotlight-live"><span class="live-dot"></span> مباشر</span>
+                        </div>
+                        <div class="spot-progress" aria-hidden="true"><i></i></div>
+                        <div class="spotlight-list" id="spotlightList">
+                            <div class="empty-state">جارٍ التحميل...</div>
+                        </div>
+                    </div>
+                </aside>
             </div>
         </section>
     </main>

@@ -10,3 +10,4 @@ serviceAccount*.json
 *serviceaccount*.json
 firebase-adminsdk*.json
 *-firebase-adminsdk-*.json
+COMMIT_MSG.txt

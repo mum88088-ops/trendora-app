@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initContentModals();
     initContactForm();
     initInstantNav();
+    initSpotlight();
     setYear();
 
     const grid = document.getElementById("articleGrid");
@@ -98,6 +99,102 @@ function renderArticles(articles) {
         .join("");
 }
 
+/* ===== أيقونات الأقسام الاحترافية (SVG متجهي يتكيّف مع لون النص) ===== */
+const _svg = (paths, extra = "") =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${extra}${paths}</svg>`;
+
+const CATEGORY_ICONS = {
+    "آخر الأخبار": _svg(`<path d="M19 20H6a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v13a2 2 0 0 0 2-2V9"/><path d="M8 8h6M8 12h6M8 16h4"/>`),
+    "التعليم": _svg(`<path d="M22 9 12 5 2 9l10 4 10-4Z"/><path d="M6 11v5c0 1.2 2.7 3 6 3s6-1.8 6-3v-5"/><path d="M22 9v5"/>`),
+    "المعاشات": _svg(`<path d="M12 3 5 6v5c0 4 3 7 7 8 4-1 7-4 7-8V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>`),
+    "المرتبات والأجور": _svg(`<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9v6M17.5 9v6"/>`),
+    "الوظائف والتوظيف": _svg(`<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7"/><path d="M3 12.5h18"/>`),
+    "الاقتصاد والأسواق": _svg(`<path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/>`),
+    "أسعار الذهب والعملات": _svg(`<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>`),
+    "الخدمات الحكومية": _svg(`<path d="M3 21h18"/><path d="M5 21V10M9.5 21V10M14.5 21V10M19 21V10"/><path d="M12 3 3.5 8h17L12 3Z"/>`),
+    "الصحة": _svg(`<path d="M20.8 8.6a4.7 4.7 0 0 0-8.8-2.1 4.7 4.7 0 0 0-8.8 2.1c0 4.3 8.8 10.2 8.8 10.2s8.8-5.9 8.8-10.2Z"/><path d="M7 12h2l1.4-3 2 5L14 12h3"/>`),
+    "التقنية": _svg(`<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/>`),
+    "الرياضة": _svg(`<path d="M8 4h8v3.5a4 4 0 0 1-8 0V4Z"/><path d="M8 5.5H5.2v1A3 3 0 0 0 8 9.4M16 5.5h2.8v1a3 3 0 0 1-2.8 2.9"/><path d="M12 11.5V16M9 20h6M10 16.5h4"/>`),
+    "الفن والمشاهير": _svg(`<path d="M12 3.5l2.6 5.2 5.8.9-4.2 4 1 5.7L12 16.7 6.8 19.3l1-5.7-4.2-4 5.8-.9L12 3.5Z"/>`),
+    "السيارات": _svg(`<path d="M3 14l1.6-5.1A2 2 0 0 1 6.5 7.5h11a2 2 0 0 1 1.9 1.4L21 14v3a1 1 0 0 1-1 1h-1.5M5.5 18H4a1 1 0 0 1-1-1v-3"/><path d="M3 14h18"/><circle cx="7.5" cy="18" r="1.6"/><circle cx="16.5" cy="18" r="1.6"/>`),
+    "الطقس": _svg(`<circle cx="8" cy="7" r="3"/><path d="M8 1.5v1.6M3 7h-1.4M14.4 7H13M4.1 3.1l1 1M11.9 3.1l-1 1"/><path d="M17.5 13.6a3.3 3.3 0 0 0-6.5-.8A3 3 0 1 0 10.5 19H17a2.7 2.7 0 0 0 .5-5.4Z"/>`),
+    "أسلوب حياة": _svg(`<path d="M4 9h12v4.5A4.5 4.5 0 0 1 11.5 18h-3A4.5 4.5 0 0 1 4 13.5V9Z"/><path d="M16 10h2.2a2.3 2.3 0 0 1 0 4.6H16"/><path d="M7 3.5v2M10 3.5v2M13 3.5v2M4 21h13"/>`),
+    "عام": _svg(`<circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/>`),
+};
+const DEFAULT_ICON = _svg(`<circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/>`);
+
+function catIcon(name) {
+    return CATEGORY_ICONS[name] || DEFAULT_ICON;
+}
+
+/* ===== الشريط الجانبي «الأبرز الآن»: يعرض مقالات مختارة ويبدّلها كل 20 ثانية
+   ليرى الزائر تشكيلة واسعة من المقالات ويمنح الموقع طابعاً احترافياً ===== */
+const SPOTLIGHT_VISIBLE = 5;
+const SPOTLIGHT_INTERVAL = 20000;
+
+async function initSpotlight() {
+    const list = document.getElementById("spotlightList");
+    if (!list) return;
+    let articles = [];
+    try {
+        const res = await fetch("/api/articles");
+        const data = await res.json();
+        articles = data.articles || [];
+    } catch {
+        document.getElementById("homeAside")?.remove();
+        return;
+    }
+    if (!articles.length) {
+        document.getElementById("homeAside")?.remove();
+        return;
+    }
+
+    let start = 0;
+    const render = () => {
+        const items = [];
+        const n = Math.min(SPOTLIGHT_VISIBLE, articles.length);
+        for (let i = 0; i < n; i++) items.push(articles[(start + i) % articles.length]);
+        list.classList.add("is-fading");
+        setTimeout(() => {
+            list.innerHTML = items.map(spotlightItem).join("");
+            list.classList.remove("is-fading");
+            restartSpotProgress();
+        }, 280);
+    };
+
+    render();
+    if (articles.length > SPOTLIGHT_VISIBLE) {
+        setInterval(() => {
+            start = (start + SPOTLIGHT_VISIBLE) % articles.length;
+            render();
+        }, SPOTLIGHT_INTERVAL);
+    }
+}
+
+function spotlightItem(a, i) {
+    const thumb = a.image
+        ? `<span class="spot-thumb" style="background-image:url('${escapeAttr(a.image)}')"></span>`
+        : `<span class="spot-thumb placeholder"></span>`;
+    return `
+    <a class="spot-item" href="/article/${encodeURIComponent(a.slug)}">
+        <span class="spot-rank">${i + 1}</span>
+        ${thumb}
+        <span class="spot-info">
+            <span class="spot-cat"><span class="cat-ico">${catIcon(a.category)}</span> ${escapeHtml(a.category)}</span>
+            <span class="spot-title">${escapeHtml(a.title)}</span>
+            <span class="spot-date">${formatDate(a.createdAt)}</span>
+        </span>
+    </a>`;
+}
+
+function restartSpotProgress() {
+    const bar = document.querySelector(".spot-progress i");
+    if (!bar) return;
+    bar.style.animation = "none";
+    void bar.offsetWidth; // إعادة تشغيل الرسم المتحرك
+    bar.style.animation = "";
+}
+
 /* ===== shared helpers ===== */
 
 /* يجلب أقسام الموقع من الخادم (مع التراجع للأقسام الافتراضية عند الفشل)
@@ -154,7 +251,7 @@ function populateCategoryMenus() {
     if (!menus.length) return;
     const itemsHtml = CATEGORIES.map(
         (c) =>
-            `<li><a href="/?cat=${encodeURIComponent(c.name)}"><span class="cat-ico">${c.icon || "📌"}</span> ${escapeHtml(c.name)}</a></li>`
+            `<li><a href="/?cat=${encodeURIComponent(c.name)}"><span class="cat-ico">${catIcon(c.name)}</span> ${escapeHtml(c.name)}</a></li>`
     ).join("");
     menus.forEach((menu) => {
         menu.innerHTML = itemsHtml;
@@ -172,7 +269,7 @@ function populateFilters() {
         shown
             .map(
                 (c) =>
-                    `<button class="filter-btn" data-cat="${escapeAttr(c.name)}"><span class="cat-ico">${c.icon || "📌"}</span> ${escapeHtml(c.name)}</button>`
+                    `<button class="filter-btn" data-cat="${escapeAttr(c.name)}"><span class="cat-ico">${catIcon(c.name)}</span> ${escapeHtml(c.name)}</button>`
             )
             .join("");
 }
