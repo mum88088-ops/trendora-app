@@ -67,10 +67,22 @@
                     <h2>إدارة المقالات</h2>
                     <div class="stats" id="stats"></div>
                 </div>
+
+                <div class="articles-toolbar">
+                    <div class="admin-search-box">
+                        <input type="search" id="articleSearchInput" placeholder="ابحث عن مقال بالعنوان أو التصنيف..." aria-label="بحث في المقالات">
+                    </div>
+                    <div class="bulk-actions" id="bulkActions" hidden>
+                        <span class="bulk-count" id="bulkCount">0 محدّد</span>
+                        <button type="button" class="btn-danger" id="bulkDeleteBtn">حذف المحدّد</button>
+                    </div>
+                </div>
+
                 <div class="table-wrap">
                     <table class="articles-table">
                         <thead>
                             <tr>
+                                <th class="col-check"><input type="checkbox" id="selectAllArticles" title="تحديد الكل" aria-label="تحديد كل المقالات"></th>
                                 <th>العنوان</th>
                                 <th>التصنيف</th>
                                 <th>الحالة</th>
@@ -79,7 +91,7 @@
                             </tr>
                         </thead>
                         <tbody id="articlesTbody">
-                            <tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>
+                            <tr><td colspan="6" class="loading">جارٍ التحميل...</td></tr>
                         </tbody>
                     </table>
                 </div>

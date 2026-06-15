@@ -52,6 +52,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("saveAdsBtn")?.addEventListener("click", saveAds);
     $("passwordForm")?.addEventListener("submit", changePassword);
     $("userForm")?.addEventListener("submit", createUser);
+
+    $("bulkDeleteBtn")?.addEventListener("click", bulkDeleteSelected);
+    $("selectAllArticles")?.addEventListener("change", toggleSelectAll);
+    $("articleSearchInput")?.addEventListener("input", filterArticlesList);
   } catch (err) {
     console.error("Admin init error:", err);
     const errEl = $("loginError");
@@ -512,24 +516,56 @@ function switchTo(view) {
 }
 
 /* ---------- list ---------- */
+let allArticlesCache = [];
+
 async function loadArticles() {
     const tbody = $("articlesTbody");
-    tbody.innerHTML = `<tr><td colspan="5" class="loading">جارٍ التحميل...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="loading">جارٍ التحميل...</td></tr>`;
     try {
         const res = await api("/api/admin/articles");
         if (res.status === 401) return handleUnauthorized();
         const { articles } = await res.json();
-        renderStats(articles);
-        if (!articles.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="loading">لا توجد مقالات بعد. ابدأ بإنشاء مقال جديد.</td></tr>`;
-            return;
-        }
-        tbody.innerHTML = articles.map(rowHtml).join("");
-        bindRowActions();
+        allArticlesCache = articles || [];
+        renderStats(allArticlesCache);
+        renderArticlesTable(allArticlesCache);
     } catch {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading">تعذّر التحميل.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="loading">تعذّر التحميل.</td></tr>`;
     }
 }
+
+function renderArticlesTable(articles) {
+    const tbody = $("articlesTbody");
+    const searchEl = $("articleSearchInput");
+    if (searchEl && searchEl.value.trim()) {
+        /* يُعاد التطبيق عبر filterArticlesList عند الكتابة */
+    }
+    resetBulkSelection();
+    if (!articles.length) {
+        const hasSearch = searchEl && searchEl.value.trim();
+        tbody.innerHTML = `<tr><td colspan="6" class="loading">${hasSearch ? "لا توجد نتائج مطابقة للبحث." : "لا توجد مقالات بعد. ابدأ بإنشاء مقال جديد."}</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = articles.map(rowHtml).join("");
+    bindRowActions();
+    bindRowCheckboxes();
+}
+
+function filterArticlesList() {
+    const q = ($("articleSearchInput")?.value || "").trim().toLowerCase();
+    if (!q) {
+        renderArticlesTable(allArticlesCache);
+        return;
+    }
+    const filtered = allArticlesCache.filter((a) => {
+        const title = (a.title || "").toLowerCase();
+        const cat = (a.category || "").toLowerCase();
+        const author = (a.author || "").toLowerCase();
+        const tags = (a.tags || []).join(" ").toLowerCase();
+        return title.includes(q) || cat.includes(q) || author.includes(q) || tags.includes(q);
+    });
+    renderArticlesTable(filtered);
+}
+
 function renderStats(articles) {
     const pub = articles.filter((a) => a.status === "published").length;
     const draft = articles.filter((a) => a.status === "draft").length;
@@ -540,11 +576,13 @@ function renderStats(articles) {
         `<span>مسودة: ${draft}</span>` +
         `<span>مخفي: ${hidden}</span>`;
 }
+
 function rowHtml(a) {
     const statusLabel = { published: "منشور", draft: "مسودة", hidden: "مخفي" }[a.status] || a.status;
     const expiredBadge = a.expired ? ` <span class="badge expired">منتهٍ</span>` : "";
     return `
     <tr data-id="${a.id}">
+        <td class="col-check"><input type="checkbox" class="row-check" value="${escapeAttr(a.id)}" aria-label="تحديد المقال"></td>
         <td class="article-title-cell">${escapeHtml(a.title)}</td>
         <td>${escapeHtml(a.category)}</td>
         <td><span class="badge ${a.status}">${statusLabel}</span>${expiredBadge}</td>
@@ -560,6 +598,81 @@ function rowHtml(a) {
         </td>
     </tr>`;
 }
+
+function bindRowCheckboxes() {
+    document.querySelectorAll("#articlesTbody .row-check").forEach((cb) => {
+        cb.addEventListener("change", updateBulkBar);
+    });
+}
+
+function getSelectedIds() {
+    return [...document.querySelectorAll("#articlesTbody .row-check:checked")].map((cb) => cb.value);
+}
+
+function updateBulkBar() {
+    const ids = getSelectedIds();
+    const bar = $("bulkActions");
+    const countEl = $("bulkCount");
+    const selectAll = $("selectAllArticles");
+    const visible = document.querySelectorAll("#articlesTbody .row-check");
+    const checked = document.querySelectorAll("#articlesTbody .row-check:checked");
+    if (bar) bar.hidden = ids.length === 0;
+    if (countEl) countEl.textContent = `${ids.length} محدّد`;
+    if (selectAll && visible.length) {
+        selectAll.checked = checked.length === visible.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < visible.length;
+    }
+}
+
+function resetBulkSelection() {
+    const selectAll = $("selectAllArticles");
+    if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    }
+    const bar = $("bulkActions");
+    if (bar) bar.hidden = true;
+}
+
+function toggleSelectAll() {
+    const selectAll = $("selectAllArticles");
+    const checked = selectAll?.checked || false;
+    document.querySelectorAll("#articlesTbody .row-check").forEach((cb) => {
+        cb.checked = checked;
+    });
+    updateBulkBar();
+}
+
+async function bulkDeleteSelected() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    const msg = ids.length === 1
+        ? "نقل هذا المقال إلى سلة المهملات؟"
+        : `نقل ${ids.length} مقالاً إلى سلة المهملات؟ يمكنك استعادتها لاحقاً.`;
+    if (!confirm(msg)) return;
+    const btn = $("bulkDeleteBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "جارٍ الحذف..."; }
+    try {
+        const res = await api("/api/admin/articles/bulk-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+        });
+        if (res.status === 401) return handleUnauthorized();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.error || "تعذّر حذف المقالات المحددة.");
+            return;
+        }
+        if ($("articleSearchInput")) $("articleSearchInput").value = "";
+        loadArticles();
+    } catch {
+        alert("تعذّر الاتصال بالخادم.");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "حذف المحدّد"; }
+    }
+}
+
 function bindRowActions() {
     document.querySelectorAll("#articlesTbody tr").forEach((tr) => {
         const id = tr.dataset.id;
@@ -1139,4 +1252,7 @@ function escapeHtml(str) {
     return String(str)
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function escapeAttr(str) {
+    return String(str).replace(/'/g, "%27").replace(/"/g, "%22");
 }

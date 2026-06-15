@@ -377,6 +377,26 @@ app.delete(
   })
 );
 
+/* حذف جماعي: نقل عدة مقالات إلى سلة المهملات دفعة واحدة */
+app.post(
+  "/api/admin/articles/bulk-delete",
+  requireAuth,
+  requirePerm("delete"),
+  wrap(async (req, res) => {
+    const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ error: "لم يتم تحديد أي مقال" });
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        if (await store.remove(id)) deleted++;
+      } catch {
+        /* تجاهل أي معرّف غير صالح وأكمل الباقي */
+      }
+    }
+    res.json({ ok: true, deleted });
+  })
+);
+
 /* ---------- trash (recycle bin) ---------- */
 app.get(
   "/api/admin/trash",
