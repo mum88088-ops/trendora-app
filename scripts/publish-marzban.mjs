@@ -5,7 +5,8 @@
 import { build, run, SITE_URL } from "./_helpers.mjs";
 
 const IMG = {
-  portrait: `${SITE_URL}/assets/img/mohamed-marzban-portrait.png`,
+  death: `${SITE_URL}/assets/img/mohamed-marzban-real-interview.png`,
+  biography: `${SITE_URL}/assets/img/mohamed-marzban-real-portrait.png`,
   will: `${SITE_URL}/assets/img/marzban-last-wish-memorial.png`,
   memorial2026: `${SITE_URL}/assets/img/egyptian-artists-2026-memorial.png`,
 };
@@ -65,7 +66,7 @@ function biographyContent() {
 const ARTICLES = [
   {
     title: "وفاة الفنان محمد مرزبان بمستشفى أبو خليفة في الإسماعيلية بعد صراع مع إصابات حادث سير",
-    image: IMG.portrait,
+    image: IMG.death,
     excerpt: "توفي الفنان محمد مرزبان صباح الأربعاء 17 يونيو 2026 داخل مستشفى أبو خليفة بالإسماعيلية، متأثراً بإصابات أليمة إثر حادث على طريق مصر–الإسماعيلية قبل 5 أيام.",
     tags: ["محمد مرزبان", "وفاة محمد مرزبان", "مستشفى أبو خليفة", "الإسماعيلية"],
     keywords: ["وفاة محمد مرزبان", "محمد مرزبان مستشفى أبو خليفة", "حادث محمد مرزبان", "جنازة محمد مرزبان", "الفنان محمد مرزبان"],
@@ -82,7 +83,7 @@ const ARTICLES = [
   },
   {
     title: "محمد مرزبان: سيرة حياة كاملة من الولادة في القاهرة حتى الوداع في الإسماعيلية",
-    image: IMG.portrait,
+    image: IMG.biography,
     excerpt: "رحلة الفنان الراحل محمد مرزبان منذ ميلاده في القاهرة عام 1954، مروراً ببداياته في التسعينيات وأعماله في كشف المستور وكلبش والأسطورة، حتى وفاته في يونيو 2026.",
     tags: ["محمد مرزبان", "سيرة محمد مرزبان", "أعمال محمد مرزبان", "وفاة الفنانين"],
     keywords: ["سيرة محمد مرزبان", "محمد مرزبان أعماله", "محمد مرزبان مسلسلات", "محمد مرزبان أفلام", "حياة محمد مرزبان", "عمر محمد مرزبان"],
