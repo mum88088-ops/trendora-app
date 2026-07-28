@@ -1238,3 +1238,6 @@ body.modal-open { overflow: hidden; }
   .thanaweya-search { padding: 16px; }
   .thanaweya-search-form button { width: 100%; }
 }
+
+.thanaweya-fallback-link { display: none !important; }
+

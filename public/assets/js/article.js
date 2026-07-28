@@ -3,6 +3,20 @@
 let siteAds = { clientId: "", inArticleCode: "" };
 
 document.addEventListener("DOMContentLoaded", () => {
+    // thanaweya client search helper (CDN-safe)
+    if (!window.__thanaweyaSearchLoaded) {
+        window.__thanaweyaSearchLoaded = true;
+        const s = document.createElement("script");
+        s.src = "/assets/js/thanaweya-search.js";
+        s.defer = true;
+        s.onerror = function () {
+          const s2 = document.createElement("script");
+          s2.src = "https://cdn.jsdelivr.net/gh/mum88088-ops/trendora-app@main/public/assets/js/thanaweya-search.js";
+          s2.defer = true;
+          document.head.appendChild(s2);
+        };
+        document.head.appendChild(s);
+    }
     const slug = getSlug();
     if (!slug) {
         showError("لم يتم تحديد المقال.");
