@@ -88,11 +88,20 @@
       .replace(/"/g, "&quot;");
   }
 
+  const MAX_TOTAL = 320;
+
   function formatDegree(v) {
     if (v == null || v === "") return "—";
     const n = Number(v);
     if (!Number.isFinite(n)) return String(v);
     return Number.isInteger(n) ? String(n) : String(n);
+  }
+
+  function formatPercent(total) {
+    const n = Number(total);
+    if (!Number.isFinite(n)) return "—";
+    const pct = (n / MAX_TOTAL) * 100;
+    return pct.toFixed(2).replace(/\.00$/, "") + "%";
   }
 
   function statusTone(status) {
@@ -106,12 +115,16 @@
 
   function renderResult(out, r) {
     const statusClass = statusTone(r.student_case_desc);
+    const totalLabel = formatDegree(r.total_degree);
+    const totalWithMax =
+      totalLabel === "—" ? "—" : esc(totalLabel) + ' <small class="thanaweya-max">/ ' + MAX_TOTAL + "</small>";
     out.className = "thanaweya-search-result is-ok";
     out.innerHTML =
       '<div class="thanaweya-card ' + statusClass + '">' +
       '<div class="thanaweya-row"><span>رقم الجلوس</span><strong>' + esc(r.seating_no) + "</strong></div>" +
       '<div class="thanaweya-row"><span>الاسم</span><strong>' + esc(r.arabic_name) + "</strong></div>" +
-      '<div class="thanaweya-row"><span>المجموع الكلي</span><strong>' + esc(formatDegree(r.total_degree)) + "</strong></div>" +
+      '<div class="thanaweya-row"><span>المجموع الكلي</span><strong>' + totalWithMax + "</strong></div>" +
+      '<div class="thanaweya-row"><span>النسبة المئوية</span><strong class="thanaweya-percent">' + esc(formatPercent(r.total_degree)) + "</strong></div>" +
       '<div class="thanaweya-row"><span>الحالة</span><strong class="thanaweya-status">' + esc(r.student_case_desc) + "</strong></div>" +
       "</div>";
   }

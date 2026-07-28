@@ -1214,6 +1214,15 @@ body.modal-open { overflow: hidden; }
 .thanaweya-row:last-child { border-bottom: 0; }
 .thanaweya-row span { color: var(--color-muted); }
 .thanaweya-row strong { color: var(--color-text); text-align: left; }
+.thanaweya-row .thanaweya-max {
+  color: var(--color-muted);
+  font-weight: 500;
+  font-size: 0.85em;
+}
+.thanaweya-row .thanaweya-percent {
+  color: var(--color-primary, #0f766e);
+  font-variant-numeric: tabular-nums;
+}
 .thanaweya-card.tone-pass { border-color: #86efac; box-shadow: inset 4px 0 0 #16a34a; }
 .thanaweya-card.tone-second { border-color: #fcd34d; box-shadow: inset 4px 0 0 #d97706; }
 .thanaweya-card.tone-fail { border-color: #fda4af; box-shadow: inset 4px 0 0 #e11d48; }
