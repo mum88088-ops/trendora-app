@@ -6,12 +6,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // thanaweya client search helper (CDN-safe)
     if (!window.__thanaweyaSearchLoaded) {
         window.__thanaweyaSearchLoaded = true;
+        const cdn = "https://cdn.jsdelivr.net/gh/mum88088-ops/trendora-app@main/public/assets/js/thanaweya-search.js";
         const s = document.createElement("script");
-        s.src = "/assets/js/thanaweya-search.js";
+        s.src = cdn;
         s.defer = true;
         s.onerror = function () {
           const s2 = document.createElement("script");
-          s2.src = "https://cdn.jsdelivr.net/gh/mum88088-ops/trendora-app@main/public/assets/js/thanaweya-search.js";
+          s2.src = "/assets/js/thanaweya-search.js";
           s2.defer = true;
           document.head.appendChild(s2);
         };
@@ -486,73 +487,28 @@ function renderSidebarList(id, items) {
 
 
 /* ===== بحث نتيجة الثانوية برقم الجلوس ===== */
+/* يفضّل سكربت thanaweya-search.js (API ثم ملف CDN) حتى يعمل البحث إن كانت واجهة السيرفر غير جاهزة */
 function initThanaweyaSearch(root) {
     const box = (root || document).querySelector("#thanaweya-result-search");
-    if (!box || box.dataset.bound === "1") return;
-    box.dataset.bound = "1";
-    const form = box.querySelector(".thanaweya-search-form");
-    const input = box.querySelector("#thanaweyaSeatInput");
-    const out = box.querySelector(".thanaweya-search-result");
-    if (!form || !input || !out) return;
+    if (!box) return;
 
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const seat = String(input.value || "").trim().replace(/\D/g, "");
-        if (!/^\d{5,10}$/.test(seat)) {
-            out.hidden = false;
-            out.className = "thanaweya-search-result is-error";
-            out.innerHTML = "<p>يرجى إدخال رقم جلوس صحيح.</p>";
-            return;
-        }
-        out.hidden = false;
-        out.className = "thanaweya-search-result is-loading";
-        out.innerHTML = "<p>جاري البحث...</p>";
-        try {
-            const res = await fetch("/api/thanaweya-results/" + encodeURIComponent(seat));
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                out.className = "thanaweya-search-result is-error";
-                const fallback = document.querySelector(".thanaweya-fallback-link");
-                let extra = "";
-                if (res.status === 404 && fallback) {
-                  extra = '<p style="margin-top:8px"><a href="' + fallback.href + '" target="_blank" rel="noopener noreferrer">افتح صفحة الاستعلام البديلة</a></p>';
-                }
-                out.innerHTML = "<p>" + escapeHtml(data.error || "تعذر جلب النتيجة") + "</p>" + extra;
-                return;
-            }
-            const r = data.result;
-            const statusClass = statusTone(r.student_case_desc);
-            out.className = "thanaweya-search-result is-ok";
-            out.innerHTML =
-                '<div class="thanaweya-card ' + statusClass + '">' +
-                '<div class="thanaweya-row"><span>رقم الجلوس</span><strong>' + escapeHtml(r.seating_no) + "</strong></div>" +
-                '<div class="thanaweya-row"><span>الاسم</span><strong>' + escapeHtml(r.arabic_name) + "</strong></div>" +
-                '<div class="thanaweya-row"><span>المجموع الكلي</span><strong>' + escapeHtml(formatDegree(r.total_degree)) + "</strong></div>" +
-                '<div class="thanaweya-row"><span>الحالة</span><strong class="thanaweya-status">' + escapeHtml(r.student_case_desc) + "</strong></div>" +
-                "</div>";
-        } catch {
-            out.className = "thanaweya-search-result is-error";
-            out.innerHTML = "<p>تعذر الاتصال بخدمة البحث حالياً. يمكنك المحاولة لاحقاً أو استخدام رابط الاستعلام البديل إن وُجد في المقال.</p>";
-        }
-    });
+    const tryExternal = () => {
+        const external = window.__thanaweyaBind;
+        if (typeof external !== "function") return false;
+        if (box.dataset.bound === "cdn1") return true;
+        delete box.dataset.bound;
+        external(root || document);
+        return box.dataset.bound === "cdn1";
+    };
+
+    if (tryExternal()) return;
+
+    let attempts = 0;
+    const timer = setInterval(() => {
+        attempts += 1;
+        if (tryExternal() || attempts >= 40) clearInterval(timer);
+    }, 100);
 }
-
-function formatDegree(v) {
-    if (v == null || v === "") return "—";
-    const n = Number(v);
-    if (!Number.isFinite(n)) return String(v);
-    return Number.isInteger(n) ? String(n) : String(n);
-}
-
-function statusTone(status) {
-    const s = String(status || "");
-    if (s.includes("ناجح")) return "tone-pass";
-    if (s.includes("دور ثان")) return "tone-second";
-    if (s.includes("راسب")) return "tone-fail";
-    if (s.includes("غياب")) return "tone-absent";
-    return "";
-}
-
 
 function showError(msg) {
     const container = document.getElementById("articleContainer");

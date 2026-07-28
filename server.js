@@ -215,13 +215,20 @@ app.get(
     if (!/^\d{5,10}$/.test(seat)) {
       return res.status(400).json({ error: "رقم الجلوس غير صالح" });
     }
+    // تحميل ~900 ألف صف في الذاكرة يُسقط الاستضافة الصغيرة — البحث يتم من المتصفح (CDN)
+    if (process.env.THANAWYA_PRELOAD !== "1") {
+      return res.status(503).json({
+        error: "قاعدة النتائج تُحمَّل من المتصفح",
+        clientFallback: true,
+      });
+    }
     try {
       const result = await lookupThanaweyaBySeat(seat);
       if (!result) return res.status(404).json({ error: "لم يتم العثور على نتيجة لهذا الرقم" });
       res.set("Cache-Control", "public, max-age=300");
       res.json({ result });
     } catch (err) {
-      res.status(503).json({ error: "قاعدة النتائج غير متاحة حالياً" });
+      res.status(503).json({ error: "قاعدة النتائج غير متاحة حالياً", clientFallback: true });
     }
   })
 );
@@ -1241,12 +1248,17 @@ app.get("/ads.txt", (req, res, next) => {
 /* ---------- static files ---------- */
 app.use(express.static(PUBLIC_DIR));
 
-preloadThanaweyaResults();
+if (process.env.THANAWYA_PRELOAD === "1") {
+  preloadThanaweyaResults();
+} else {
+  console.log("  ℹ️  بحث الثانوية: وضع العميل (CDN) — عيّن THANAWYA_PRELOAD=1 لتفعيل API السيرفر");
+}
 
 app.listen(PORT, () => {
   console.log(`\n  ✅ Trendora يعمل الآن على: http://localhost:${PORT}`);
   console.log(`  🛠️  لوحة التحكم: http://localhost:${PORT}/admin.html`);
   console.log(`  💾 التخزين: ${store.backend}`);
+  console.log(`  🎓 نتيجة الثانوية: http://localhost:${PORT}/thanaweya-2026.html`);
   if (!OPENAI_API_KEY) {
     console.log("  ⚠️  لتفعيل توليد المقالات بالذكاء الاصطناعي أضف OPENAI_API_KEY\n");
   }

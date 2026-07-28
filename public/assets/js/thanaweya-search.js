@@ -53,11 +53,19 @@
   }
 
   async function lookupApi(seat) {
-    const res = await fetch("/api/thanaweya-results/" + encodeURIComponent(seat));
-    if (!res.ok) throw new Error("api " + res.status);
-    const data = await res.json();
-    if (!data.result) throw new Error("empty");
-    return data.result;
+    const controller = new AbortController();
+    const timer = setTimeout(function () { controller.abort(); }, 4000);
+    try {
+      const res = await fetch("/api/thanaweya-results/" + encodeURIComponent(seat), {
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error("api " + res.status);
+      const data = await res.json();
+      if (!data.result) throw new Error("empty");
+      return data.result;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function lookupClient(seat) {
@@ -118,14 +126,21 @@
 
   function bind(root) {
     const box = (root || document).querySelector("#thanaweya-result-search");
-    if (!box || box.dataset.bound === "1") return;
-    box.dataset.bound = "1";
-    const form = box.querySelector(".thanaweya-search-form");
+    if (!box) return;
+    if (box.dataset.bound === "cdn1") return;
+
+    // Replace form to drop any previous API-only listeners from article.js
+    let form = box.querySelector(".thanaweya-search-form");
+    if (form) {
+      const clone = form.cloneNode(true);
+      form.parentNode.replaceChild(clone, form);
+      form = clone;
+    }
     const input = box.querySelector("#thanaweyaSeatInput, input[name='seat']");
     const out = box.querySelector(".thanaweya-search-result");
     if (!form || !input || !out) return;
+    box.dataset.bound = "cdn1";
 
-    // preload in background
     loadMap().catch(function () {});
 
     form.addEventListener("submit", async function (e) {
@@ -159,14 +174,15 @@
     bind(document);
   }
 
+  window.__thanaweyaBind = bind;
+  window.initThanaweyaSearch = bind;
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else {
     boot();
   }
-  // also expose
-  window.initThanaweyaSearch = bind;
-  // retry after article SPA render
+
   const obs = new MutationObserver(function () { bind(document); });
   obs.observe(document.documentElement, { childList: true, subtree: true });
 })();
