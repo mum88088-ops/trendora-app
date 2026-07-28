@@ -11,3 +11,7 @@ serviceAccount*.json
 firebase-adminsdk*.json
 *-firebase-adminsdk-*.json
 COMMIT_MSG.txt
+
+# نتائج الثانوية (الملف المضغوط هو المصدر المعتمد للنشر)
+data/thanaweya-2026.sqlite
+data/_sample*.txt
