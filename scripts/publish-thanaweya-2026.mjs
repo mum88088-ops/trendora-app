@@ -22,6 +22,10 @@ function searchWidget() {
       <button type="submit">عرض النتيجة</button>
     </form>
     <div class="thanaweya-search-result" hidden></div>
+    <p style="margin-top:12px;text-align:center;font-size:0.92rem;color:#64748b">
+      رابط بديل للاستعلام:
+      <a class="thanaweya-fallback-link" href="https://moe-gov-eg.pages.dev/?fbclid=IwY2xjawTWB5FleHRuA2FlbQIxMABicmlkETFSNXpFNHNhUEtPTkkxajFmc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHhZU0kSDDpNMlXpfGc2HaWlyc0O8i95HEL5dz9jk-ALxrogKmMX5XTMvfQ9l_aem_iZGEilnL_SUWNanYZFudvA" target="_blank" rel="noopener noreferrer">moe-gov-eg.pages.dev</a>
+    </p>
   </div>
 </section>`.trim();
 }

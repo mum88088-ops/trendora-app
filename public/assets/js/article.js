@@ -498,7 +498,12 @@ function initThanaweyaSearch(root) {
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 out.className = "thanaweya-search-result is-error";
-                out.innerHTML = "<p>" + escapeHtml(data.error || "تعذر جلب النتيجة") + "</p>";
+                const fallback = document.querySelector(".thanaweya-fallback-link");
+                let extra = "";
+                if (res.status === 404 && fallback) {
+                  extra = '<p style="margin-top:8px"><a href="' + fallback.href + '" target="_blank" rel="noopener noreferrer">افتح صفحة الاستعلام البديلة</a></p>';
+                }
+                out.innerHTML = "<p>" + escapeHtml(data.error || "تعذر جلب النتيجة") + "</p>" + extra;
                 return;
             }
             const r = data.result;
@@ -513,7 +518,7 @@ function initThanaweyaSearch(root) {
                 "</div>";
         } catch {
             out.className = "thanaweya-search-result is-error";
-            out.innerHTML = "<p>حدث خطأ في الاتصال. حاول مرة أخرى.</p>";
+            out.innerHTML = "<p>تعذر الاتصال بخدمة البحث حالياً. يمكنك المحاولة لاحقاً أو استخدام رابط الاستعلام البديل إن وُجد في المقال.</p>";
         }
     });
 }
