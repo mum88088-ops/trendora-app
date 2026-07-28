@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // thanaweya client search helper (CDN-safe)
     if (!window.__thanaweyaSearchLoaded) {
         window.__thanaweyaSearchLoaded = true;
-        const cdn = "https://cdn.jsdelivr.net/gh/mum88088-ops/trendora-app@main/public/assets/js/thanaweya-search.js";
+        const cdn = "https://cdn.jsdelivr.net/gh/mum88088-ops/trendora-app@017e5b7/public/assets/js/thanaweya-search.js";
         const s = document.createElement("script");
         s.src = cdn;
         s.defer = true;
